@@ -130,7 +130,7 @@ func parseSpecifier(str io.RuneScanner) (parsefunc, error) {
 		var name string
 		if peek(str) == '(' {
 			str.ReadRune()
-			name = readUntil(str, func(r rune) bool { return r == ')' })
+			name = readUntil(str, func(r rune) bool { return r != ')' })
 		}
 		return getWord(name), nil
 	default:
@@ -399,5 +399,5 @@ func isEscape(r rune) bool {
 }
 
 func charactersMismatch(want, got rune) error {
-	return fmt.Errorf("%w: characters mismatched! want %c, got %c", ErrPattern, want, got)
+	return fmt.Errorf("%w: characters mismatched! want '%c', got '%c'", ErrPattern, want, got)
 }
