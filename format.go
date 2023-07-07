@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"index/suffixarray"
 	"io"
 	"strconv"
 	"strings"
@@ -129,7 +130,7 @@ func parseSpecifier(str io.RuneScanner) (parsefunc, error) {
 		var name string
 		if peek(str) == '(' {
 			str.ReadRune()
-			name = readUntil(str, func(r rune) bool { return r ==')' })
+			name = readUntil(str, func(r rune) bool { return r == ')' })
 		}
 		return getWord(name), nil
 	default:
@@ -146,7 +147,7 @@ func parseHostFormat(str io.RuneScanner) (hostfunc, error) {
 }
 
 var timeMapping = map[string]string{
-	// "yy":   "06",
+	"yy":   "06",
 	"yyyy": "2006",
 	"m":    "1",
 	"mm":   "01",
@@ -164,7 +165,19 @@ var timeMapping = map[string]string{
 	"SSS":  "000",
 }
 
-const timeCodes = "yYdmMsSdH"
+var timeCodes = prepareTimeCodes()
+
+func prepareTimeCodes() *suffixarray.Index {
+	var (
+		keys []string
+		data string
+	)
+	for k := range timeMapping {
+		keys = append(keys, k)
+	}
+	data = strings.Join(keys, "\x00")
+	return suffixarray.New([]byte(data))
+}
 
 func parseTimeFormat(str io.RuneScanner) (string, error) {
 	if k := peek(str); k != '(' {
@@ -174,44 +187,37 @@ func parseTimeFormat(str io.RuneScanner) (string, error) {
 	var (
 		tmp  bytes.Buffer
 		res  bytes.Buffer
-		code string
+		char rune
 	)
 	for {
-		char, _, _ := str.ReadRune()
-		if isEOL(char) {
-			return "", ErrSyntax
-		}
-		if char == ')' {
+		if char, _, _ = str.ReadRune(); isEOL(char) {
+			return "", ErrPattern
+		} else if char == ')' {
 			break
 		}
-		if !isLetter(char) && !strings.ContainsRune(timeCodes, char) {
-			if code != "" {
+		prev := tmp.String()
+		if !isLetter(char) {
+			match := timeCodes.Lookup(tmp.Bytes(), -1)
+			if len(match) > 0 {
+				code := timeMapping[tmp.String()]
 				res.WriteString(code)
-				tmp.Reset()
-				code = ""
 			}
 			res.WriteRune(char)
+			tmp.Reset()
 			continue
 		}
 		tmp.WriteRune(char)
-		maybe, ok := timeMapping[tmp.String()]
-		if ok {
-			code = maybe
-			continue
-		}
-		if !ok && code != "" {
-			res.WriteString(code)
+		switch match := timeCodes.Lookup(tmp.Bytes(), -1); {
+		case len(match) == 1:
+			res.WriteString(timeMapping[tmp.String()])
 			tmp.Reset()
-			code = ""
-			if strings.ContainsRune(timeCodes, char) {
-				tmp.WriteRune(char)
-			} else {
-				res.WriteRune(char)
-			}
+		case len(match) == 0 && prev != "":
+			res.WriteString(timeMapping[prev])
+			res.WriteRune(char)
+			tmp.Reset()
+		default:
+			// pass
 		}
-	}
-	if code != "" {
-		res.WriteString(code)
 	}
 	return res.String(), nil
 }
