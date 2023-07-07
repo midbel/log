@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 	"unicode/utf8"
+	"strings"
 )
 
 // line specifiers (read)
@@ -55,7 +56,7 @@ func parseFormat(pattern string) (parsefunc, error) {
 	}
 	var (
 		str = bytes.NewReader([]byte(pattern))
-		buf bytes.Buffer
+		tmp bytes.Buffer
 		pfs []parsefunc
 	)
 	for str.Len() > 0 {
@@ -67,13 +68,13 @@ func parseFormat(pattern string) (parsefunc, error) {
 			if c == '%' {
 				str.ReadRune()
 			}
-			buf.WriteRune(c)
+			tmp.WriteRune(c)
 			continue
 		}
-		if buf.Len() > 0 {
-			fn := getLiteral(buf.Bytes())
-			pfs = append(pfs, fn)
-			buf.Reset()
+		if tmp.Len() > 0 {
+			in := tmp.String()
+			pfs = append(pfs, getLiteral(in))
+			tmp.Reset()
 		}
 		fn, err := parseSpecifier(str)
 		if err != nil {
@@ -81,9 +82,9 @@ func parseFormat(pattern string) (parsefunc, error) {
 		}
 		pfs = append(pfs, fn)
 	}
-	if buf.Len() > 0 {
-		fn := getLiteral(buf.Bytes())
-		pfs = append(pfs, fn)
+	if tmp.Len() > 0 {
+		in := tmp.String()
+		pfs = append(pfs, getLiteral(in))
 	}
 	return mergeParse(pfs), nil
 }
@@ -125,7 +126,7 @@ func parseSpecifier(str io.RuneScanner) (parsefunc, error) {
 }
 
 const (
-	defaultTimeFormat = "yyyy-mm-ddTHH:MM:SSZ"
+	defaultTimeFormat = "yyyy-mm-dd HH:MM:SS"
 )
 
 func parseHostFormat(str io.RuneScanner) (hostfunc, error) {
@@ -133,7 +134,7 @@ func parseHostFormat(str io.RuneScanner) (hostfunc, error) {
 }
 
 var timeMapping = map[string]string{
-	"yy":   "06",
+	// "yy":   "06",
 	"yyyy": "2006",
 	"m":    "1",
 	"mm":   "01",
@@ -215,6 +216,7 @@ func mergeParse(pfs []parsefunc) parsefunc {
 }
 
 func getUser(e *Entry, r io.RuneScanner) error {
+	fmt.Println("getuser")
 	e.User = readLiteral(r)
 	return nil
 }
@@ -225,6 +227,7 @@ func getGroup(e *Entry, r io.RuneScanner) error {
 }
 
 func getProcess(e *Entry, r io.RuneScanner) error {
+	fmt.Println("getprocess")
 	e.Process = readLiteral(r)
 	return nil
 }
@@ -235,6 +238,7 @@ func getLevel(e *Entry, r io.RuneScanner) error {
 }
 
 func getPID(e *Entry, r io.RuneScanner) error {
+	fmt.Println("getpid")
 	var (
 		str = readLiteral(r)
 		err error
@@ -249,6 +253,7 @@ func getBlank(_ *Entry, r io.RuneScanner) error {
 }
 
 func getMessage(e *Entry, r io.RuneScanner) error {
+	fmt.Println("getmessage")
 	e.Message = readLiteral(r)
 	return nil
 }
@@ -260,8 +265,12 @@ func getWord(e *Entry, r io.RuneScanner) error {
 
 func getWhen(format string) parsefunc {
 	fn := func(e *Entry, r io.RuneScanner) error {
-		var err error
-		e.When, err = time.Parse(format, readLiteral(r))
+		defer r.UnreadRune()
+		var (
+			str = readUntil(r, func(r rune) bool { return !isBlank(r) })
+			err error
+		)
+		e.When, err = time.Parse(format, str)
 		return err
 	}
 	return fn
@@ -276,19 +285,16 @@ func getHost(get hostfunc) parsefunc {
 	return fn
 }
 
-func getLiteral(str []byte) parsefunc {
-	fn := func(_ *Entry, r io.RuneScanner) error {
-		g := bytes.NewReader(str)
-		for {
-			gc, _, _ := g.ReadRune()
-			rc, _, _ := r.ReadRune()
-			if rc != gc {
-				return ErrPattern
+func getLiteral(str string) parsefunc {
+	return func(_ *Entry, r io.RuneScanner) error {
+		for _, curr := range str {
+			char, _, _ := r.ReadRune()
+			if curr != char {
+				return charactersMismatch(curr, char)
 			}
 		}
 		return nil
 	}
-	return fn
 }
 
 func readLiteral(r io.RuneScanner) string {
@@ -362,4 +368,8 @@ func isQuote(r rune) bool {
 
 func isEscape(r rune) bool {
 	return r == '\\' || r == '@' || r == '*' || r == '(' || r == ')' || r == '|'
+}
+
+func charactersMismatch(want, got rune) error {
+	return fmt.Errorf("%w: characters mismatched! want %c, got %c", ErrPattern, want, got)
 }

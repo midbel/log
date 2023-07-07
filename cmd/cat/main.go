@@ -1,7 +1,10 @@
 package main
 
 import (
+	"errors"
+	"encoding/json"
 	"flag"
+	"io"
 	"fmt"
 	"os"
 
@@ -9,15 +12,16 @@ import (
 )
 
 var (
-	input  = "[%t] [%h(%4:%p)]%b%u:%g:%n [%p:%l(INFO, WARNING)]:%b%m"
+	input  = "[%t] [%h(%4:%p)]%b%u:%g:%n [%p:%l]:%b%m"
 	output = "%t %n[%p]: %m"
 )
 
 func main() {
 	var (
-		in     = flag.String("i", input, "input pattern")
-		out    = flag.String("o", output, "output pattern")
+		in     = flag.String("i", "", "input pattern")
+		out    = flag.String("o", "", "output pattern")
 		filter = flag.String("f", "", "filter log entry")
+		jsonify = flag.Bool("j", false, "jsonify results")
 	)
 	flag.Parse()
 
@@ -33,19 +37,51 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	ws, err := log.NewWriter(os.Stdout, *out)
+	if *jsonify {
+		err = toJson(rs)
+	} else {
+		err = toLog(rs, *out)
+	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		os.Exit(2)
+	}
+}
+
+func toJson(rs *log.Reader) error {
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("  ", "  ")
+	for {
+		e, err := rs.Read()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+		if err := enc.Encode(e); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func toLog(rs *log.Reader, format string) error {
+	ws, err := log.NewWriter(os.Stdout, format)
+	if err != nil {
+		return err
 	}
 	for i := 1; ; i++ {
 		e, err := rs.Read()
 		if err != nil {
-			break
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
 		}
 		if err := ws.Write(e); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			break
+			return err
 		}
 	}
+	return nil
 }
