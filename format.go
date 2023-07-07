@@ -132,17 +132,26 @@ func parseHostFormat(str io.RuneScanner) (hostfunc, error) {
 	return nil, nil
 }
 
-
 var timeMapping = map[string]string{
+	"yy":   "06",
 	"yyyy": "2006",
-	"mm": "01",
-	"dd": "02",
-	"ddd": "002",
-	"HH": "15",
-	"MM": "04",
-	"ss": "05",
-	"SSS": "000",
+	"m":    "1",
+	"mm":   "01",
+	"mmm":  "Jan",
+	"ccc":  "Mon",
+	"d":    "2",
+	"dd":   "02",
+	"ddd":  "002",
+	"H":    "3",
+	"HH":   "15",
+	"M":    "4",
+	"MM":   "04",
+	"ss":   "05",
+	"S":    "0",
+	"SSS":  "000",
 }
+
+const timeCodes = "yYdmMsSdH"
 
 func parseTimeFormat(str io.RuneScanner) (string, error) {
 	if k := peek(str); k != '(' {
@@ -150,34 +159,48 @@ func parseTimeFormat(str io.RuneScanner) (string, error) {
 	}
 	str.ReadRune()
 	var (
-		tmp bytes.Buffer
-		res bytes.Buffer
+		tmp  bytes.Buffer
+		res  bytes.Buffer
 		code string
 	)
 	for {
-		c, _, _ := str.ReadRune()
-		if isEOL(c) {
+		char, _, _ := str.ReadRune()
+		if isEOL(char) {
 			return "", ErrSyntax
 		}
-		if c == ')' {
+		if char == ')' {
 			break
 		}
-		tmp.WriteRune(c)
-
-		may, ok := timeMapping[tmp.String()]
-		switch {
-		case !ok && code == "":
-			tmp.Reset()
-			res.WriteRune(c)
-		case !ok && code != "":
-			tmp.Reset()
+		if !isLetter(char) && !strings.ContainsRune(timeCodes, char) {
+			if code != "" {
+				res.WriteString(code)
+				tmp.Reset()
+				code = ""
+			}
+			res.WriteRune(char)
+			continue
+		}
+		tmp.WriteRune(char)
+		maybe, ok := timeMapping[tmp.String()]
+		if ok {
+			code = maybe
+			continue
+		}
+		if !ok && code != "" {
 			res.WriteString(code)
-		case ok:
-			code = may
-		default:
+			tmp.Reset()
+			code = ""
+			if strings.ContainsRune(timeCodes, char) {
+				tmp.WriteRune(char)
+			} else {
+				res.WriteRune(char)
+			}
 		}
 	}
-	return buf.String(), nil
+	if code != "" {
+		res.WriteString(code)
+	}
+	return res.String(), nil
 }
 
 func mergeParse(pfs []parsefunc) parsefunc {
