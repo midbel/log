@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 	"time"
 	"unicode/utf8"
-	"strings"
 )
 
 // line specifiers (read)
@@ -264,16 +264,24 @@ func getWord(e *Entry, r io.RuneScanner) error {
 }
 
 func getWhen(format string) parsefunc {
-	fn := func(e *Entry, r io.RuneScanner) error {
-		defer r.UnreadRune()
+	iter := strings.Count(format, " ")
+	return func(e *Entry, r io.RuneScanner) error {
 		var (
-			str = readUntil(r, func(r rune) bool { return !isBlank(r) })
-			err error
+			parts []string
+			err   error
 		)
-		e.When, err = time.Parse(format, str)
+		for i := 0; i <= iter; i++ {
+			str := readUntil(r, func(r rune) bool { return !isBlank(r) })
+			r.UnreadRune()
+
+			parts = append(parts, str)
+			if i < iter {
+				readBlank(r)
+			}
+		}
+		e.When, err = time.Parse(format, strings.Join(parts, " "))
 		return err
 	}
-	return fn
 }
 
 func getHost(get hostfunc) parsefunc {

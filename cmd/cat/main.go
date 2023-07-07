@@ -1,11 +1,11 @@
 package main
 
 import (
-	"errors"
 	"encoding/json"
+	"errors"
 	"flag"
-	"io"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/midbel/log"
@@ -18,9 +18,9 @@ var (
 
 func main() {
 	var (
-		in     = flag.String("i", "", "input pattern")
-		out    = flag.String("o", "", "output pattern")
-		filter = flag.String("f", "", "filter log entry")
+		in      = flag.String("i", "", "input pattern")
+		out     = flag.String("o", "", "output pattern")
+		filter  = flag.String("f", "", "filter log entry")
 		jsonify = flag.Bool("j", false, "jsonify results")
 	)
 	flag.Parse()
