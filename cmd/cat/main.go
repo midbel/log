@@ -50,7 +50,7 @@ func main() {
 
 func toJson(rs *log.Reader) error {
 	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("  ", "  ")
+	enc.SetIndent("", "  ")
 	for {
 		e, err := rs.Read()
 		if err != nil {

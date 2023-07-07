@@ -48,7 +48,7 @@ func (r *Reader) ReadAll() ([]Entry, error) {
 }
 
 func (r *Reader) Read() (Entry, error) {
-	var e Entry
+	e := Empty()
 	if r.err != nil {
 		return e, r.err
 	}

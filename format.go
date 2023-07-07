@@ -41,8 +41,15 @@ type Entry struct {
 	Level   string
 	Message string
 	Words   []string
+	Named   map[string]string
 	Host    string
 	When    time.Time
+}
+
+func Empty() Entry {
+	var e Entry
+	e.Named = make(map[string]string)
+	return e
 }
 
 type (
@@ -119,7 +126,12 @@ func parseSpecifier(str io.RuneScanner) (parsefunc, error) {
 	case 'm':
 		return getMessage, nil
 	case 'w':
-		return getWord, nil
+		var name string
+		if peek(str) == '(' {
+			str.ReadRune()
+			name = readUntil(str, func(r rune) bool { return r ==')' })
+		}
+		return getWord(name), nil
 	default:
 	}
 	return nil, fmt.Errorf("%w: unsupported specifier %%%c", ErrSyntax, r)
@@ -216,7 +228,6 @@ func mergeParse(pfs []parsefunc) parsefunc {
 }
 
 func getUser(e *Entry, r io.RuneScanner) error {
-	fmt.Println("getuser")
 	e.User = readLiteral(r)
 	return nil
 }
@@ -227,7 +238,6 @@ func getGroup(e *Entry, r io.RuneScanner) error {
 }
 
 func getProcess(e *Entry, r io.RuneScanner) error {
-	fmt.Println("getprocess")
 	e.Process = readLiteral(r)
 	return nil
 }
@@ -238,7 +248,6 @@ func getLevel(e *Entry, r io.RuneScanner) error {
 }
 
 func getPID(e *Entry, r io.RuneScanner) error {
-	fmt.Println("getpid")
 	var (
 		str = readLiteral(r)
 		err error
@@ -253,14 +262,19 @@ func getBlank(_ *Entry, r io.RuneScanner) error {
 }
 
 func getMessage(e *Entry, r io.RuneScanner) error {
-	fmt.Println("getmessage")
 	e.Message = readLiteral(r)
 	return nil
 }
 
-func getWord(e *Entry, r io.RuneScanner) error {
-	e.Words = append(e.Words, readLiteral(r))
-	return nil
+func getWord(name string) parsefunc {
+	return func(e *Entry, r io.RuneScanner) error {
+		str := readLiteral(r)
+		if name != "" && e.Named != nil {
+			e.Named[name] = str
+		}
+		e.Words = append(e.Words, str)
+		return nil
+	}
 }
 
 func getWhen(format string) parsefunc {
