@@ -1,6 +1,6 @@
 module github.com/midbel/log
 
-go 1.16
+go 1.20
 
 require (
 	github.com/midbel/tail v0.0.0-20201121193655-238eedd09f56

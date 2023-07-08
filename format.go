@@ -134,49 +134,86 @@ func parseSpecifier(str io.RuneScanner) (parsefunc, error) {
 		}
 		return getWord(name), nil
 	default:
+		return nil, fmt.Errorf("%w: specifier '%%%c' not recognized", ErrSyntax, r)
 	}
-	return nil, fmt.Errorf("%w: unsupported specifier %%%c", ErrSyntax, r)
 }
 
 const (
 	defaultTimeFormat = "yyyy-mm-dd HH:MM:SS"
+	defaultHostFormat = "hostname"
 )
 
 func parseHostFormat(str io.RuneScanner) (hostfunc, error) {
-	return nil, nil
-}
-
-var timeMapping = map[string]string{
-	"yy":   "06",
-	"yyyy": "2006",
-	"m":    "1",
-	"mm":   "01",
-	"mmm":  "Jan",
-	"ccc":  "Mon",
-	"d":    "2",
-	"dd":   "02",
-	"ddd":  "002",
-	"H":    "3",
-	"HH":   "15",
-	"M":    "4",
-	"MM":   "04",
-	"ss":   "05",
-	"S":    "0",
-	"SSS":  "000",
-}
-
-var timeCodes = prepareTimeCodes()
-
-func prepareTimeCodes() *suffixarray.Index {
-	var (
-		keys []string
-		data string
-	)
-	for k := range timeMapping {
-		keys = append(keys, k)
+	if k := peek(str); k != '(' {
+		return getHostname, nil
 	}
-	data = strings.Join(keys, "\x00")
-	return suffixarray.New([]byte(data))
+	str.ReadRune()
+	var (
+		char rune
+		hfs  []hostfunc
+	)
+	for {
+		if char, _, _ = str.ReadRune(); isEOL(char) {
+			return nil, fmt.Errorf("%w: missing ')'", ErrSyntax)
+		} else if char == ')' {
+			break
+		}
+		str.UnreadRune()
+
+		var (
+			pat = readAlpha(str)
+			fn = hostMapping[pat]
+		)
+		if fn == nil {
+			return nil, fmt.Errorf("%s not recognized", pat)
+		}
+		hfs = append(hfs, fn)
+		if peek(str) == ')' {
+			continue
+		}
+		pat = readUntil(str, func(r rune) bool { return !isAlpha(r) })
+		if pat != "" {
+			hfs = append(hfs, getHostLiteral(pat))
+		}
+		str.UnreadRune()
+	}
+	return mergeHost(hfs), nil
+}
+
+func getHostname(str io.RuneScanner) (string, error) {
+	return readAlpha(str), nil
+}
+
+func getHostFQDN(str io.RuneScanner) (string, error) {
+	return readAlpha(str), nil
+}
+
+func getHostIP4(str io.RuneScanner) (string, error) {
+	return readAlpha(str), nil
+}
+
+func getHostIP6(str io.RuneScanner) (string, error) {
+	return readAlpha(str), nil
+}
+
+func getHostPort(str io.RuneScanner) (string, error) {
+	return readAlpha(str), nil
+}
+
+func getHostMask(str io.RuneScanner) (string, error) {
+	return readAlpha(str), nil
+}
+
+func getHostLiteral(in string) hostfunc {
+	return func(str io.RuneScanner) (string, error) {
+		for _, char := range in {
+			c, _, _ := str.ReadRune()
+			if char != c {
+				return "", charactersMismatch(char, c)
+			}
+		}
+		return in, nil
+	}
 }
 
 func parseTimeFormat(str io.RuneScanner) (string, error) {
@@ -191,7 +228,7 @@ func parseTimeFormat(str io.RuneScanner) (string, error) {
 	)
 	for {
 		if char, _, _ = str.ReadRune(); isEOL(char) {
-			return "", ErrPattern
+			return "", fmt.Errorf("%w: missing ')'", ErrSyntax)
 		} else if char == ')' {
 			break
 		}
@@ -220,6 +257,20 @@ func parseTimeFormat(str io.RuneScanner) (string, error) {
 		}
 	}
 	return res.String(), nil
+}
+
+func mergeHost(hfs []hostfunc) hostfunc {
+	return func(str io.RuneScanner) (string, error) {
+		var parts []string
+		for _, fn := range hfs {
+			s, err := fn(str)
+			if err != nil {
+				return "", err
+			}
+			parts = append(parts, s)
+		}
+		return strings.Join(parts, ""), nil
+	}
 }
 
 func mergeParse(pfs []parsefunc) parsefunc {
@@ -356,7 +407,7 @@ func readUntil(r io.RuneScanner, accept func(rune) bool) string {
 	var buf bytes.Buffer
 	for {
 		c, _, _ := r.ReadRune()
-		if !accept(c) {
+		if !accept(c) && !isEOL(c) {
 			break
 		}
 		buf.WriteRune(c)
@@ -379,7 +430,7 @@ func isLetter(r rune) bool {
 }
 
 func isAlpha(r rune) bool {
-	return isDigit(r) || isLetter(r) || r == '-' || r == '_'
+	return isDigit(r) || isLetter(r) || r == '-' || r == '_' || r == '.'
 }
 
 func isBlank(r rune) bool {
@@ -400,4 +451,46 @@ func isEscape(r rune) bool {
 
 func charactersMismatch(want, got rune) error {
 	return fmt.Errorf("%w: characters mismatched! want '%c', got '%c'", ErrPattern, want, got)
+}
+
+var hostMapping = map[string]hostfunc{
+	"hostname": getHostname,
+	"fqdn":     getHostFQDN,
+	"ip4":      getHostIP4,
+	"ip6":      getHostIP6,
+	"port":     getHostPort,
+	"mask":     getHostMask,
+}
+
+var timeCodes = indexArray(timeMapping)
+
+var timeMapping = map[string]string{
+	"yy":   "06",
+	"yyyy": "2006",
+	"m":    "1",
+	"mm":   "01",
+	"mmm":  "Jan",
+	"ccc":  "Mon",
+	"d":    "2",
+	"dd":   "02",
+	"ddd":  "002",
+	"H":    "3",
+	"HH":   "15",
+	"M":    "4",
+	"MM":   "04",
+	"ss":   "05",
+	"S":    "0",
+	"SSS":  "000",
+}
+
+func indexArray[T any](in map[string]T) *suffixarray.Index {
+	var (
+		keys []string
+		data string
+	)
+	for k := range in {
+		keys = append(keys, k)
+	}
+	data = strings.Join(keys, "\x00")
+	return suffixarray.New([]byte(data))
 }
