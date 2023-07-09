@@ -12,6 +12,7 @@ type printfunc func(Entry, io.StringWriter)
 
 // line specifiers (writing)
 // format %[w][[fg:bg]]c
+// %d
 // %t: time
 // %n: process
 // %p: pid
@@ -86,6 +87,8 @@ func parsePrint(pattern string) (printfunc, error) {
 				info.Func = printMessage
 			case '#':
 				info.Func = printLine
+			case 'd':
+				info.Func = printLino
 			case 'w':
 				info.Func = printName("")
 			default:
@@ -142,6 +145,10 @@ func mergePrint(pfs []printinfo) printfunc {
 			p.Print(e, w)
 		}
 	}
+}
+
+func printLino(e Entry, w io.StringWriter) {
+	w.WriteString(strconv.Itoa(e.Lino))
 }
 
 func printLiteral(str string) printfunc {

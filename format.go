@@ -36,6 +36,7 @@ var (
 )
 
 type Entry struct {
+	Lino int
 	Line string
 
 	Pid     int

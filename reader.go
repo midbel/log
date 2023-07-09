@@ -10,6 +10,7 @@ type Reader struct {
 	inner *bufio.Scanner
 	err   error
 
+	lino  int
 	keep  filterfunc
 	parse parsefunc
 }
@@ -47,11 +48,13 @@ func (r *Reader) ReadAll() ([]Entry, error) {
 }
 
 func (r *Reader) Read() (Entry, error) {
+	r.lino++
+	
 	e := Empty()
 	if r.err != nil {
 		return e, r.err
 	}
-	for {
+	for i := 1; ; i++ {
 		if !r.inner.Scan() {
 			r.err = r.inner.Err()
 			if r.err == nil {
@@ -72,7 +75,8 @@ func (r *Reader) Read() (Entry, error) {
 			return e, r.err
 		}
 		if r.keep == nil || r.keep(e) {
-			e.Line = r.inner.Text()
+			e.Line = line
+			e.Lino = r.lino
 			break
 		}
 	}
