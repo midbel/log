@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"index/suffixarray"
-	"io"
 	"strconv"
 	"strings"
 	"time"
@@ -54,8 +53,8 @@ func Empty() Entry {
 }
 
 type (
-	parsefunc func(*Entry, io.RuneScanner) error
-	hostfunc  func(io.RuneScanner) (string, error)
+	parsefunc func(*Entry, *scanner) error
+	hostfunc  func(*scanner) (string, error)
 )
 
 func parseFormat(pattern string) (parsefunc, error) {
@@ -63,20 +62,23 @@ func parseFormat(pattern string) (parsefunc, error) {
 		return nil, fmt.Errorf("%w: empty pattern not allowed", ErrSyntax)
 	}
 	var (
-		str = bytes.NewReader([]byte(pattern))
+		str = scan(pattern)
 		tmp bytes.Buffer
 		pfs []parsefunc
 	)
-	for str.Len() > 0 {
-		c, _, _ := str.ReadRune()
-		if c == utf8.RuneError {
+	for {
+		char := str.read()
+		if str.done() {
+			break
+		}
+		if char == utf8.RuneError {
 			return nil, fmt.Errorf("error reading pattern: %s", pattern)
 		}
-		if k := peek(str); c != '%' || c == k {
-			if c == '%' {
-				str.ReadRune()
+		if k := str.peek(); char != '%' || char == k {
+			if char == '%' {
+				str.read()
 			}
-			tmp.WriteRune(c)
+			tmp.WriteRune(char)
 			continue
 		}
 		if tmp.Len() > 0 {
@@ -97,9 +99,9 @@ func parseFormat(pattern string) (parsefunc, error) {
 	return mergeParse(pfs), nil
 }
 
-func parseSpecifier(str io.RuneScanner) (parsefunc, error) {
-	r, _, _ := str.ReadRune()
-	switch r {
+func parseSpecifier(str *scanner) (parsefunc, error) {
+	char := str.read()
+	switch char {
 	case 't':
 		format, err := parseTimeFormat(str)
 		if err != nil {
@@ -128,13 +130,13 @@ func parseSpecifier(str io.RuneScanner) (parsefunc, error) {
 		return getMessage, nil
 	case 'w':
 		var name string
-		if peek(str) == '(' {
-			str.ReadRune()
-			name = readUntil(str, func(r rune) bool { return r != ')' })
+		if str.peek() == '(' {
+			str.read()
+			name = str.readUntil(func(r rune) bool { return r != ')' })
 		}
 		return getWord(name), nil
 	default:
-		return nil, fmt.Errorf("%w: specifier '%%%c' not recognized", ErrSyntax, r)
+		return nil, fmt.Errorf("%w: specifier '%%%c' not recognized", ErrSyntax, char)
 	}
 }
 
@@ -143,71 +145,71 @@ const (
 	defaultHostFormat = "hostname"
 )
 
-func parseHostFormat(str io.RuneScanner) (hostfunc, error) {
-	if k := peek(str); k != '(' {
+func parseHostFormat(str *scanner) (hostfunc, error) {
+	if k := str.peek(); k != '(' {
 		return getHostname, nil
 	}
-	str.ReadRune()
+	str.read()
 	var (
 		char rune
 		hfs  []hostfunc
 	)
-	for {
-		if char, _, _ = str.ReadRune(); isEOL(char) {
+	for !str.done() {
+		if char = str.read(); isEOL(char) {
 			return nil, fmt.Errorf("%w: missing ')'", ErrSyntax)
 		} else if char == ')' {
 			break
 		}
-		str.UnreadRune()
+		str.unread()
 
 		var (
-			pat = readAlpha(str)
-			fn = hostMapping[pat]
+			pat = str.readAlpha()
+			fn  = hostMapping[pat]
 		)
 		if fn == nil {
 			return nil, fmt.Errorf("%s not recognized", pat)
 		}
 		hfs = append(hfs, fn)
-		if peek(str) == ')' {
+		if str.peek() == ')' {
 			continue
 		}
-		pat = readUntil(str, func(r rune) bool { return !isAlpha(r) })
+		pat = str.readUntil(func(r rune) bool { return !isAlpha(r) })
 		if pat != "" {
 			hfs = append(hfs, getHostLiteral(pat))
 		}
-		str.UnreadRune()
+		str.unread()
 	}
 	return mergeHost(hfs), nil
 }
 
-func getHostname(str io.RuneScanner) (string, error) {
-	return readAlpha(str), nil
+func getHostname(str *scanner) (string, error) {
+	return str.readAlpha(), nil
 }
 
-func getHostFQDN(str io.RuneScanner) (string, error) {
-	return readAlpha(str), nil
+func getHostFQDN(str *scanner) (string, error) {
+	return str.readAlpha(), nil
 }
 
-func getHostIP4(str io.RuneScanner) (string, error) {
-	return readAlpha(str), nil
+func getHostIP4(str *scanner) (string, error) {
+	return str.readAlpha(), nil
 }
 
-func getHostIP6(str io.RuneScanner) (string, error) {
-	return readAlpha(str), nil
+func getHostIP6(str *scanner) (string, error) {
+	return str.readAlpha(), nil
 }
 
-func getHostPort(str io.RuneScanner) (string, error) {
-	return readAlpha(str), nil
+func getHostPort(str *scanner) (string, error) {
+	return str.readAlpha(), nil
 }
 
-func getHostMask(str io.RuneScanner) (string, error) {
-	return readAlpha(str), nil
+func getHostMask(str *scanner) (string, error) {
+	return str.readAlpha(), nil
 }
 
 func getHostLiteral(in string) hostfunc {
-	return func(str io.RuneScanner) (string, error) {
+	return func(str *scanner) (string, error) {
 		for _, char := range in {
-			c, _, _ := str.ReadRune()
+			c := str.read()
 			if char != c {
 				return "", charactersMismatch(char, c)
 			}
@@ -216,18 +218,18 @@ func getHostLiteral(in string) hostfunc {
 	}
 }
 
-func parseTimeFormat(str io.RuneScanner) (string, error) {
-	if k := peek(str); k != '(' {
+func parseTimeFormat(str *scanner) (string, error) {
+	if k := str.peek(); k != '(' {
 		return defaultTimeFormat, nil
 	}
-	str.ReadRune()
+	str.read()
 	var (
 		tmp  bytes.Buffer
 		res  bytes.Buffer
 		char rune
 	)
-	for {
-		if char, _, _ = str.ReadRune(); isEOL(char) {
+	for !str.done() {
+		if char = str.read(); isEOL(char) {
 			return "", fmt.Errorf("%w: missing ')'", ErrSyntax)
 		} else if char == ')' {
 			break
@@ -260,7 +262,7 @@ func parseTimeFormat(str io.RuneScanner) (string, error) {
 }
 
 func mergeHost(hfs []hostfunc) hostfunc {
-	return func(str io.RuneScanner) (string, error) {
+	return func(str *scanner) (string, error) {
 		var parts []string
 		for _, fn := range hfs {
 			s, err := fn(str)
@@ -274,9 +276,9 @@ func mergeHost(hfs []hostfunc) hostfunc {
 }
 
 func mergeParse(pfs []parsefunc) parsefunc {
-	return func(e *Entry, r io.RuneScanner) error {
+	return func(e *Entry, str *scanner) error {
 		for _, pf := range pfs {
-			if err := pf(e, r); err != nil {
+			if err := pf(e, str); err != nil {
 				return err
 			}
 		}
@@ -284,70 +286,70 @@ func mergeParse(pfs []parsefunc) parsefunc {
 	}
 }
 
-func getUser(e *Entry, r io.RuneScanner) error {
-	e.User = readLiteral(r)
+func getUser(e *Entry, str *scanner) error {
+	e.User = str.readLiteral()
 	return nil
 }
 
-func getGroup(e *Entry, r io.RuneScanner) error {
-	e.Group = readLiteral(r)
+func getGroup(e *Entry, str *scanner) error {
+	e.Group = str.readLiteral()
 	return nil
 }
 
-func getProcess(e *Entry, r io.RuneScanner) error {
-	e.Process = readLiteral(r)
+func getProcess(e *Entry, str *scanner) error {
+	e.Process = str.readLiteral()
 	return nil
 }
 
-func getLevel(e *Entry, r io.RuneScanner) error {
-	e.Level = readLiteral(r)
+func getLevel(e *Entry, str *scanner) error {
+	e.Level = str.readLiteral()
 	return nil
 }
 
-func getPID(e *Entry, r io.RuneScanner) error {
+func getPID(e *Entry, str *scanner) error {
 	var (
-		str = readLiteral(r)
+		pid = str.readLiteral()
 		err error
 	)
-	e.Pid, err = strconv.Atoi(str)
+	e.Pid, err = strconv.Atoi(pid)
 	return err
 }
 
-func getBlank(_ *Entry, r io.RuneScanner) error {
-	readBlank(r)
+func getBlank(_ *Entry, str *scanner) error {
+	str.readBlank()
 	return nil
 }
 
-func getMessage(e *Entry, r io.RuneScanner) error {
-	e.Message = readLiteral(r)
+func getMessage(e *Entry, str *scanner) error {
+	e.Message = str.readLiteral()
 	return nil
 }
 
 func getWord(name string) parsefunc {
-	return func(e *Entry, r io.RuneScanner) error {
-		str := readLiteral(r)
+	return func(e *Entry, str *scanner) error {
+		word := str.readLiteral()
 		if name != "" && e.Named != nil {
-			e.Named[name] = str
+			e.Named[name] = word
 		}
-		e.Words = append(e.Words, str)
+		e.Words = append(e.Words, word)
 		return nil
 	}
 }
 
 func getWhen(format string) parsefunc {
 	iter := strings.Count(format, " ")
-	return func(e *Entry, r io.RuneScanner) error {
+	return func(e *Entry, str *scanner) error {
 		var (
 			parts []string
 			err   error
 		)
 		for i := 0; i <= iter; i++ {
-			str := readUntil(r, func(r rune) bool { return !isBlank(r) })
-			r.UnreadRune()
+			frag := str.readUntil(func(r rune) bool { return !isBlank(r) })
+			str.unread()
 
-			parts = append(parts, str)
+			parts = append(parts, frag)
 			if i < iter {
-				readBlank(r)
+				str.readBlank()
 			}
 		}
 		e.When, err = time.Parse(format, strings.Join(parts, " "))
@@ -356,97 +358,24 @@ func getWhen(format string) parsefunc {
 }
 
 func getHost(get hostfunc) parsefunc {
-	fn := func(e *Entry, r io.RuneScanner) error {
+	fn := func(e *Entry, str *scanner) error {
 		var err error
-		e.Host, err = get(r)
+		e.Host, err = get(str)
 		return err
 	}
 	return fn
 }
 
-func getLiteral(str string) parsefunc {
-	return func(_ *Entry, r io.RuneScanner) error {
-		for _, curr := range str {
-			char, _, _ := r.ReadRune()
+func getLiteral(in string) parsefunc {
+	return func(_ *Entry, str *scanner) error {
+		for _, curr := range in {
+			char := str.read()
 			if curr != char {
 				return charactersMismatch(curr, char)
 			}
 		}
 		return nil
 	}
-}
-
-func readLiteral(r io.RuneScanner) string {
-	c := peek(r)
-	if isQuote(c) {
-		return readQuote(r, c)
-	}
-	return readAlpha(r)
-}
-
-func readQuote(r io.RuneScanner, quote rune) string {
-	r.ReadRune()
-	return readUntil(r, func(c rune) bool { return c == quote })
-}
-
-func readAlpha(r io.RuneScanner) string {
-	defer r.UnreadRune()
-	return readUntil(r, isAlpha)
-}
-
-func readBlank(r io.RuneScanner) {
-	defer r.UnreadRune()
-	readUntil(r, isBlank)
-}
-
-func readAll(r io.RuneScanner) string {
-	return readUntil(r, isEOL)
-}
-
-func readUntil(r io.RuneScanner, accept func(rune) bool) string {
-	var buf bytes.Buffer
-	for {
-		c, _, _ := r.ReadRune()
-		if !accept(c) && !isEOL(c) {
-			break
-		}
-		buf.WriteRune(c)
-	}
-	return buf.String()
-}
-
-func peek(r io.RuneScanner) rune {
-	defer r.UnreadRune()
-	c, _, _ := r.ReadRune()
-	return c
-}
-
-func isDigit(r rune) bool {
-	return r >= '0' && r <= '9'
-}
-
-func isLetter(r rune) bool {
-	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
-}
-
-func isAlpha(r rune) bool {
-	return isDigit(r) || isLetter(r) || r == '-' || r == '_' || r == '.'
-}
-
-func isBlank(r rune) bool {
-	return r == ' ' || r == '\t' || r == '\n'
-}
-
-func isEOL(r rune) bool {
-	return r == 0 || r == utf8.RuneError
-}
-
-func isQuote(r rune) bool {
-	return r == '\'' || r == '"'
-}
-
-func isEscape(r rune) bool {
-	return r == '\\' || r == '@' || r == '*' || r == '(' || r == ')' || r == '|'
 }
 
 func charactersMismatch(want, got rune) error {

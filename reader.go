@@ -2,7 +2,6 @@ package log
 
 import (
 	"bufio"
-	"bytes"
 	"errors"
 	"io"
 )
@@ -60,11 +59,11 @@ func (r *Reader) Read() (Entry, error) {
 			}
 			return e, r.err
 		}
-		line := r.inner.Bytes()
+		line := r.inner.Text()
 		if len(line) == 0 {
 			continue
 		}
-		err := r.parse(&e, bytes.NewReader(line))
+		err := r.parse(&e, scan(line))
 		if err != nil {
 			if errors.Is(err, ErrPattern) {
 				continue

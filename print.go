@@ -28,19 +28,22 @@ func parsePrint(pattern string) (printfunc, error) {
 		return nil, fmt.Errorf("%w: empty pattern not allowed", ErrSyntax)
 	}
 	var (
-		str = bytes.NewReader([]byte(pattern))
+		str = scan(pattern)
 		buf bytes.Buffer
 		pfs []printfunc
 	)
-	for str.Len() > 0 {
-		r, _, _ := str.ReadRune()
-		if k := peek(str); r == '%' && k != r {
-			r, _, _ = str.ReadRune()
+	for {
+		char := str.read()
+		if str.done() {
+			break
+		}
+		if k := str.peek(); char == '%' && k != char {
+			str.read()
 			if buf.Len() > 0 {
 				pfs = append(pfs, printLiteral(buf.String()))
 				buf.Reset()
 			}
-			switch r {
+			switch char {
 			case 't':
 				pfs = append(pfs, printTime)
 			case 'n':
@@ -60,14 +63,17 @@ func parsePrint(pattern string) (printfunc, error) {
 			case '#':
 				pfs = append(pfs, printLine)
 			default:
-				return nil, fmt.Errorf("%w(print): unknown specifier %c", ErrPattern, r)
+				return nil, fmt.Errorf("%w(print): unknown specifier %%%c", ErrPattern, char)
 			}
 		} else {
-			if r == '%' && k == r {
-				str.ReadRune()
+			if char == '%' && k == char {
+				str.read()
 			}
-			buf.WriteRune(r)
+			buf.WriteRune(char)
 		}
+	}
+	if buf.Len() > 0 {
+		pfs = append(pfs, printLiteral(buf.String()))
 	}
 	return mergePrint(pfs), nil
 }
