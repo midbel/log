@@ -38,7 +38,7 @@ func parsePrint(pattern string) (printfunc, error) {
 			break
 		}
 		if k := str.peek(); char == '%' && k != char {
-			str.read()
+			char = str.read()
 			if buf.Len() > 0 {
 				pfs = append(pfs, printLiteral(buf.String()))
 				buf.Reset()

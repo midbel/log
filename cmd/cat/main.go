@@ -67,6 +67,7 @@ func toJson(rs *log.Reader) error {
 }
 
 func toLog(rs *log.Reader, format string) error {
+	fmt.Println(format)
 	ws, err := log.NewWriter(os.Stdout, format)
 	if err != nil {
 		return err
