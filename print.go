@@ -108,6 +108,7 @@ func parsePrint(pattern string) (printfunc, error) {
 
 type printinfo struct {
 	Width int
+	Left  bool
 	Back  string
 	Fore  string
 	Func  printfunc
@@ -120,7 +121,16 @@ func infoFromFunc(fn printfunc) printinfo {
 }
 
 func (p printinfo) Print(e Entry, w io.StringWriter) {
+	if code := foregroundAnsiCodes[p.Fore]; code != "" {
+		w.WriteString(code)
+	}
+	if code := backgroundAnsiCodes[p.Back]; code != "" {
+		w.WriteString(code)
+	}
 	p.Func(e, w)
+	if p.Fore != "" || p.Back != "" {
+		w.WriteString(resetAnsiCode)
+	}
 }
 
 func mergePrint(pfs []printinfo) printfunc {
@@ -213,4 +223,44 @@ func printString(str string, w io.StringWriter) {
 		return
 	}
 	w.WriteString(str)
+}
+
+var resetAnsiCode = "\033[0m"
+
+var backgroundAnsiCodes = map[string]string{
+	"black":         "\033[48;5;40m",
+	"red":           "\033[48;5;41m",
+	"green":         "\033[48;5;42m",
+	"yellow":        "\033[48;5;43m",
+	"blue":          "\033[48;5;44m",
+	"magenta":       "\033[48;5;45m",
+	"cyan":          "\033[48;5;46m",
+	"white":         "\033[48;5;47m",
+	"brightblack":   "\033[48;5;100m",
+	"brightred":     "\033[48;5;101m",
+	"brightgreen":   "\033[48;5;102m",
+	"brightyellow":  "\033[48;5;103m",
+	"brightblue":    "\033[48;5;104m",
+	"brightmagenta": "\033[48;5;105m",
+	"brightcyan":    "\033[48;5;106m",
+	"brightwhite":   "\033[48;5;107m",
+}
+
+var foregroundAnsiCodes = map[string]string{
+	"black":         "\033[38;5;30m",
+	"red":           "\033[38;5;31m",
+	"green":         "\033[38;5;32m",
+	"yellow":        "\033[38;5;33m",
+	"blue":          "\033[38;5;34m",
+	"magenta":       "\033[38;5;35m",
+	"cyan":          "\033[38;5;36m",
+	"white":         "\033[38;5;37m",
+	"brightblack":   "\033[38;5;90m",
+	"brightred":     "\033[38;5;91m",
+	"brightgreen":   "\033[38;5;92m",
+	"brightyellow":  "\033[38;5;93m",
+	"brightblue":    "\033[38;5;94m",
+	"brightmagenta": "\033[38;5;95m",
+	"brightcyan":    "\033[38;5;96m",
+	"brightwhite":   "\033[38;5;97m",
 }
