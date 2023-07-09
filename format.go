@@ -25,6 +25,11 @@ import (
 // %%: a percent sign
 // c : any character(s)
 
+const (
+	defaultTimeFormat = "2006-01-02 15:04:05"
+	defaultHostFormat = "hostname"
+)
+
 var (
 	ErrPattern = errors.New("invalid pattern")
 	ErrSyntax  = errors.New("syntax error")
@@ -61,17 +66,31 @@ func parseFormat(pattern string) (parsefunc, error) {
 		return nil, fmt.Errorf("%w: empty pattern not allowed", ErrSyntax)
 	}
 	var (
+		pfs []parsefunc
 		str = scan(pattern)
+	)
+	for !str.done() {
+		fn, err := parsePattern(str)
+		if err != nil {
+			return nil, err
+		}
+		pfs = append(pfs, fn)
+	}
+	return mergeAlternative(pfs), nil
+}
+
+func parsePattern(str *scanner) (parsefunc, error) {
+	var (
 		tmp bytes.Buffer
 		pfs []parsefunc
 	)
 	for {
 		char := str.read()
-		if str.done() {
+		if str.done() || char == '|' {
 			break
 		}
 		if char == utf8.RuneError {
-			return nil, fmt.Errorf("error reading pattern: %s", pattern)
+			return nil, fmt.Errorf("error reading pattern")
 		}
 		if k := str.peek(); char != '%' || char == k {
 			if char == '%' {
@@ -138,11 +157,6 @@ func parseSpecifier(str *scanner) (parsefunc, error) {
 		return nil, fmt.Errorf("%w: specifier '%%%c' not recognized", ErrSyntax, char)
 	}
 }
-
-const (
-	defaultTimeFormat = "yyyy-mm-dd HH:MM:SS"
-	defaultHostFormat = "hostname"
-)
 
 func parseHostFormat(str *scanner) (hostfunc, error) {
 	if k := str.peek(); k != '(' {
@@ -231,6 +245,18 @@ func mergeHost(hfs []hostfunc) hostfunc {
 	}
 }
 
+func mergeAlternative(pfs []parsefunc) parsefunc {
+	return func(e *Entry, str *scanner) error {
+		for _, pf := range pfs {
+			str.reset()
+			if err := pf(e, str); err == nil {
+				return nil
+			}
+		}
+		return ErrPattern
+	}
+}
+
 func mergeParse(pfs []parsefunc) parsefunc {
 	return func(e *Entry, str *scanner) error {
 		for _, pf := range pfs {
@@ -293,22 +319,9 @@ func getWord(name string) parsefunc {
 }
 
 func getWhen(format string) parsefunc {
-	iter := strings.Count(format, " ")
 	return func(e *Entry, str *scanner) error {
-		var (
-			parts []string
-			err   error
-		)
-		for i := 0; i <= iter; i++ {
-			frag := str.readUntil(func(r rune) bool { return !isBlank(r) })
-			str.unread()
-
-			parts = append(parts, frag)
-			if i < iter {
-				str.readBlank()
-			}
-		}
-		e.When, err = time.Parse(format, strings.Join(parts, " "))
+		var err error
+		e.When, err = time.Parse(format, str.readN(len(format)))
 		return err
 	}
 }

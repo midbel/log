@@ -24,6 +24,24 @@ func scan(str string) *scanner {
 	}
 }
 
+func (s *scanner) rest() string {
+	return s.input[s.next:]
+}
+
+func (s *scanner) reset() {
+	s.cursor = cursor{}
+	s.old = s.cursor
+}
+
+func (s *scanner) readN(n int) string {
+	var buf bytes.Buffer
+	for i := 0; i < n; i++ {
+		char := s.read()
+		buf.WriteRune(char)
+	}
+	return buf.String()
+}
+
 func (s *scanner) readUntil(accept func(rune) bool) string {
 	var buf bytes.Buffer
 	for !s.done() {
