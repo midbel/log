@@ -246,6 +246,9 @@ func mergeHost(hfs []hostfunc) hostfunc {
 }
 
 func mergeAlternative(pfs []parsefunc) parsefunc {
+	if len(pfs) == 1 {
+		return pfs[0]
+	}
 	return func(e *Entry, str *scanner) error {
 		for _, pf := range pfs {
 			str.reset()
@@ -258,6 +261,9 @@ func mergeAlternative(pfs []parsefunc) parsefunc {
 }
 
 func mergeParse(pfs []parsefunc) parsefunc {
+	if len(pfs) == 1 {
+		return pfs[0]
+	}
 	return func(e *Entry, str *scanner) error {
 		for _, pf := range pfs {
 			if err := pf(e, str); err != nil {
