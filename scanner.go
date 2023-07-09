@@ -44,6 +44,11 @@ func (s *scanner) readLiteral() string {
 	return s.readAlpha()
 }
 
+func (s *scanner) readText() string {
+	defer s.unread()
+	return s.readUntil(isLetter)
+}
+
 func (s *scanner) readAlpha() string {
 	defer s.unread()
 	return s.readUntil(isAlpha)

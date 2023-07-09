@@ -45,7 +45,11 @@ func parsePrint(pattern string) (printfunc, error) {
 			}
 			switch char {
 			case 't':
-				pfs = append(pfs, printTime)
+				format, err := parseTimeFormat(str)
+				if err != nil {
+					return nil, err
+				}
+				pfs = append(pfs, printTime(format))
 			case 'n':
 				pfs = append(pfs, printProcess)
 			case 'p':
@@ -62,6 +66,8 @@ func parsePrint(pattern string) (printfunc, error) {
 				pfs = append(pfs, printMessage)
 			case '#':
 				pfs = append(pfs, printLine)
+			case 'w':
+				pfs = append(pfs, printName(""))
 			default:
 				return nil, fmt.Errorf("%w(print): unknown specifier %%%c", ErrPattern, char)
 			}
@@ -102,12 +108,26 @@ func printWord(i int) printfunc {
 	}
 }
 
-func printTime(e Entry, w io.StringWriter) {
-	var str string
-	if !e.When.IsZero() {
-		str = e.When.Format(time.RFC3339)
+func printName(name string) printfunc {
+	return func(e Entry, w io.StringWriter) {
+		if name == "" {
+			return
+		}
+		printString(e.Named[name], w)
 	}
-	printString(str, w)
+}
+
+func printTime(format string) printfunc {
+	if format == "" {
+		format = time.RFC3339
+	}
+	return func(e Entry, w io.StringWriter) {
+		var str string
+		if !e.When.IsZero() {
+			str = e.When.Format(format)
+		}
+		printString(str, w)
+	}
 }
 
 func printProcess(e Entry, w io.StringWriter) {
