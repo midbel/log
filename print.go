@@ -31,7 +31,7 @@ func parsePrint(pattern string) (printfunc, error) {
 	var (
 		str = scan(pattern)
 		buf bytes.Buffer
-		pfs []printfunc
+		pfs []printinfo
 	)
 	for {
 		char := str.read()
@@ -41,62 +41,57 @@ func parsePrint(pattern string) (printfunc, error) {
 		if k := str.peek(); char == '%' && k != char {
 			char = str.read()
 			if buf.Len() > 0 {
-				pfs = append(pfs, printLiteral(buf.String()))
+				fn := printLiteral(buf.String())
+				pfs = append(pfs, infoFromFunc(fn))
 				buf.Reset()
 			}
-			var (
-				width int
-				bg    string
-				fg    string
-			)
+			var info printinfo
 			if isDigit(char) {
 				str.unread()
-				// get width
-				width, _ = strconv.Atoi(str.readNumber())
+				info.Width, _ = strconv.Atoi(str.readNumber())
 				char = str.read()
 			}
 			if char == '[' {
-				// foreground:background color(s)
-				fg = str.readUntil(func(r rune) bool {
+				info.Fore = str.readUntil(func(r rune) bool {
 					return r != ',' && r != ']'
 				})
 				if str.current() == ',' {
-					bg = str.readUntil(func(r rune) bool { return r != ']' })
+					info.Back = str.readUntil(func(r rune) bool { return r != ']' })
 				}
 				if str.current() != ']' {
 					return nil, fmt.Errorf("missing closing ']")
 				}
 				char = str.read()
 			}
-			_, _, _ = fg, bg, width
 			switch char {
 			case 't':
 				format, err := parseTimeFormat(str)
 				if err != nil {
 					return nil, err
 				}
-				pfs = append(pfs, printTime(format))
+				info.Func = printTime(format)
 			case 'n':
-				pfs = append(pfs, printProcess)
+				info.Func = printProcess
 			case 'p':
-				pfs = append(pfs, printPID)
+				info.Func = printPID
 			case 'u':
-				pfs = append(pfs, printUser)
+				info.Func = printUser
 			case 'g':
-				pfs = append(pfs, printGroup)
+				info.Func = printGroup
 			case 'h':
-				pfs = append(pfs, printHost)
+				info.Func = printHost
 			case 'l':
-				pfs = append(pfs, printLevel)
+				info.Func = printLevel
 			case 'm':
-				pfs = append(pfs, printMessage)
+				info.Func = printMessage
 			case '#':
-				pfs = append(pfs, printLine)
+				info.Func = printLine
 			case 'w':
-				pfs = append(pfs, printName(""))
+				info.Func = printName("")
 			default:
 				return nil, fmt.Errorf("%w(print): unknown specifier %%%c", ErrPattern, char)
 			}
+			pfs = append(pfs, info)
 		} else {
 			if char == '%' && k == char {
 				str.read()
@@ -105,18 +100,36 @@ func parsePrint(pattern string) (printfunc, error) {
 		}
 	}
 	if buf.Len() > 0 {
-		pfs = append(pfs, printLiteral(buf.String()))
+		fn := printLiteral(buf.String())
+		pfs = append(pfs, infoFromFunc(fn))
 	}
 	return mergePrint(pfs), nil
 }
 
-func mergePrint(pfs []printfunc) printfunc {
+type printinfo struct {
+	Width int
+	Back  string
+	Fore  string
+	Func  printfunc
+}
+
+func infoFromFunc(fn printfunc) printinfo {
+	return printinfo{
+		Func: fn,
+	}
+}
+
+func (p printinfo) Print(e Entry, w io.StringWriter) {
+	p.Func(e, w)
+}
+
+func mergePrint(pfs []printinfo) printfunc {
 	if len(pfs) == 1 {
-		return pfs[0]
+		return pfs[0].Print
 	}
 	return func(e Entry, w io.StringWriter) {
 		for _, p := range pfs {
-			p(e, w)
+			p.Print(e, w)
 		}
 	}
 }
