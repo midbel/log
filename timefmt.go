@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"index/suffixarray"
 	"strings"
+	"time"
 )
 
 func parseTimeFormat(str *scanner) (string, error) {
@@ -81,4 +82,24 @@ func indexArray[T any](in map[string]T) *suffixarray.Index {
 	}
 	data = strings.Join(keys, "\x00")
 	return suffixarray.New([]byte(data))
+}
+
+var timesFormat = []string{
+	"2006-01-02",
+	"2006-01-02 15:04:05",
+	"2006-01-02T15:04:05",
+}
+
+func parseTime(str string) (time.Time, error) {
+	var (
+		when time.Time
+		err  error
+	)
+	for _, f := range timesFormat {
+		when, err = time.Parse(f, str)
+		if err == nil {
+			return when, nil
+		}
+	}
+	return when, err
 }
