@@ -11,6 +11,7 @@ import (
 type printfunc func(Entry, io.StringWriter)
 
 // line specifiers (writing)
+// format %[w][[fg:bg]]c
 // %t: time
 // %n: process
 // %p: pid
@@ -43,6 +44,31 @@ func parsePrint(pattern string) (printfunc, error) {
 				pfs = append(pfs, printLiteral(buf.String()))
 				buf.Reset()
 			}
+			var (
+				width int
+				bg    string
+				fg    string
+			)
+			if isDigit(char) {
+				str.unread()
+				// get width
+				width, _ = strconv.Atoi(str.readNumber())
+				char = str.read()
+			}
+			if char == '[' {
+				// foreground:background color(s)
+				fg = str.readUntil(func(r rune) bool {
+					return r != ',' && r != ']'
+				})
+				if str.current() == ',' {
+					bg = str.readUntil(func(r rune) bool { return r != ']' })
+				}
+				if str.current() != ']' {
+					return nil, fmt.Errorf("missing closing ']")
+				}
+				char = str.read()
+			}
+			_, _, _ = fg, bg, width
 			switch char {
 			case 't':
 				format, err := parseTimeFormat(str)
@@ -85,6 +111,9 @@ func parsePrint(pattern string) (printfunc, error) {
 }
 
 func mergePrint(pfs []printfunc) printfunc {
+	if len(pfs) == 1 {
+		return pfs[0]
+	}
 	return func(e Entry, w io.StringWriter) {
 		for _, p := range pfs {
 			p(e, w)

@@ -54,6 +54,11 @@ func (s *scanner) readUntil(accept func(rune) bool) string {
 	return buf.String()
 }
 
+func (s *scanner) readNumber() string {
+	defer s.unread()
+	return s.readUntil(isDigit)
+}
+
 func (s *scanner) readLiteral() string {
 	char := s.peek()
 	if isQuote(char) {
