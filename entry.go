@@ -6,7 +6,7 @@ import (
 )
 
 var commonFormat = map[string]string{
-	"": "%t(mmm dd HH:MM:ss) %u %n[%p]: %m",
+	"": "%t(mmm d HH:MM:ss) %u %n[%p]: %m",
 }
 
 var defaultParseFormat = map[string]string{}

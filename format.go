@@ -300,7 +300,18 @@ func getWord(name string) parsefunc {
 func getWhen(format string) parsefunc {
 	return func(e *Entry, str *scanner) error {
 		var err error
-		e.When, err = time.Parse(format, str.readN(len(format)))
+		for i := len(format); i >= len(format)/2; i-- {
+			str.save()
+			e.When, err = time.Parse(format, str.readN(i))
+			if err == nil {
+				break
+			}
+			str.restore()
+		}
+		//e.When, err = time.Parse(format, str.readN(len(format)))
+		if err != nil {
+			err = ErrPattern
+		}
 		return err
 	}
 }

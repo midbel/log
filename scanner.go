@@ -24,6 +24,14 @@ func scan(str string) *scanner {
 	}
 }
 
+func (s *scanner) save() {
+	s.old = s.cursor
+}
+
+func (s *scanner) restore() {
+	s.cursor = s.old
+}
+
 func (s *scanner) rest() string {
 	return s.input[s.next:]
 }
