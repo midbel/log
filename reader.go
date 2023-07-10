@@ -6,6 +6,8 @@ import (
 	"io"
 )
 
+var defaultParseFormat = map[string]string{}
+
 type Reader struct {
 	inner *bufio.Scanner
 	err   error
@@ -16,6 +18,9 @@ type Reader struct {
 }
 
 func NewReader(rs io.Reader, pattern, filter string) (*Reader, error) {
+	if str, ok := defaultParseFormat[pattern]; ok {
+		pattern = str
+	}
 	var (
 		r   Reader
 		err error

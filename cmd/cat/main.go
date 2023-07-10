@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -37,37 +36,23 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if *jsonify {
-		err = toJson(rs)
-	} else {
-		err = toLog(rs, *out)
-	}
+	err = toLog(rs, *out, *jsonify)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
 }
 
-func toJson(rs *log.Reader) error {
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
-	for {
-		e, err := rs.Read()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			return err
-		}
-		if err := enc.Encode(e); err != nil {
-			return err
-		}
+func toLog(rs *log.Reader, format string, jsonify bool) error {
+	var (
+		ws  log.Writer
+		err error
+	)
+	if jsonify {
+		ws, _ = log.Json(os.Stdout, true)
+	} else {
+		ws, err = log.Text(os.Stdout, format)
 	}
-	return nil
-}
-
-func toLog(rs *log.Reader, format string) error {
-	ws, err := log.NewWriter(os.Stdout, format)
 	if err != nil {
 		return err
 	}

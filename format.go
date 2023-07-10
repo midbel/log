@@ -36,19 +36,19 @@ var (
 )
 
 type Entry struct {
-	Lino int
-	Line string
+	Lino int    `json:"-"`
+	Line string `json:"-"`
 
-	Pid     int
-	Process string
-	User    string
-	Group   string
-	Level   string
-	Message string
-	Words   []string
-	Named   map[string]string
-	Host    string
-	When    time.Time
+	Pid     int               `json:"pid,omitempty"`
+	Process string            `json:"process,omitempty"`
+	User    string            `json:"user,omitempty"`
+	Group   string            `json:"group,omitempty"`
+	Level   string            `json:"level,omitempty"`
+	Message string            `json:"message,omitempty"`
+	Words   []string          `json:"-"`
+	Named   map[string]string `json:"-"`
+	Host    string            `json:"hostname,omitempty"`
+	When    time.Time         `json:"time,omitempty"`
 }
 
 func Empty() Entry {
@@ -65,6 +65,9 @@ type (
 func parseFormat(pattern string) (parsefunc, error) {
 	if pattern == "" {
 		return nil, fmt.Errorf("%w: empty pattern not allowed", ErrSyntax)
+	}
+	if str, ok := defaultParseFormat[pattern]; ok {
+		pattern = str
 	}
 	var (
 		pfs []parsefunc
