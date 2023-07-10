@@ -93,7 +93,12 @@ func parsePrint(pattern string) (printfunc, error) {
 			case 'w':
 				info.Func = printName("")
 			default:
-				return nil, fmt.Errorf("%w(print): unknown specifier %%%c", ErrPattern, char)
+				if !isDigit(char) {
+					return nil, fmt.Errorf("%w(print): unknown specifier %%%c", ErrPattern, char)
+				}
+				str.unread()
+				n, _ := strconv.Atoi(str.readNumber())
+				info.Func = printWord(n)
 			}
 			pfs = append(pfs, info)
 		} else {
