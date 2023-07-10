@@ -54,22 +54,25 @@ func parseTimeFormat(str *scanner) (string, error) {
 var timeCodes = indexArray(timeMapping)
 
 var timeMapping = map[string]string{
-	"yy":   "06",
-	"yyyy": "2006",
-	"m":    "1",
-	"mm":   "01",
-	"mmm":  "Jan",
-	"ccc":  "Mon",
-	"d":    "2",
-	"dd":   "02",
-	"ddd":  "002",
-	"H":    "3",
-	"HH":   "15",
-	"M":    "4",
-	"MM":   "04",
-	"ss":   "05",
-	"S":    "0",
-	"SSS":  "000",
+	"yy":   "06",   // year 2 digits
+	"yyyy": "2006", // year 4 digits
+	"m":    "1",    // month no padding
+	"mm":   "01",   // month 2 digits zero padded
+	"mmm":  "Jan",  // abbr month name
+	"ccc":  "Mon",  // abbr day of week name
+	"d":    "2",    // day of month no padding
+	"dd":   "02",   // day of month 2 digits zero padded
+	"ddd":  "002",  // day of year 3 digits zero padded
+	"h":    "3",    // hour of day zero padding 0-12
+	"hh":   "03",   // hour of day 2 digits zero padding 0-12
+	// "H":    "",     // hour of day no padding 0-24
+	"HH":   "15",   // hour of day zero padding 0-24
+	"M":    "4",    // minute of hour no padding
+	"MM":   "04",   // minute of hour 2 digits zero padding
+	"s":    "5",    // second of minute no padding
+	"ss":   "05",   // second of minute 2 digits zero padding
+	"S":    "0",    // milliseconds
+	"SSS":  "000",  // milliseconds
 }
 
 func indexArray[T any](in map[string]T) *suffixarray.Index {
