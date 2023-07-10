@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -130,7 +131,23 @@ func (p printinfo) Print(e Entry, w io.StringWriter) {
 	if code := backgroundAnsiCodes[p.Back]; code != "" {
 		w.WriteString(code)
 	}
-	p.Func(e, w)
+	var (
+		ws  = w
+		tmp bytes.Buffer
+	)
+	if p.Width > 0 {
+		ws = &tmp
+	}
+	p.Func(e, ws)
+	if p.Width > 0 {
+		diff := p.Width - tmp.Len()
+		if diff > 0 {
+			tmp.WriteString(strings.Repeat(" ", diff))
+		} else if diff < 0 {
+			tmp.Truncate(tmp.Len() + diff)
+		}
+		w.WriteString(tmp.String())
+	}
 	if p.Fore != "" || p.Back != "" {
 		w.WriteString(resetAnsiCode)
 	}
