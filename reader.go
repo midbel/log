@@ -49,7 +49,7 @@ func (r *Reader) ReadAll() ([]Entry, error) {
 
 func (r *Reader) Read() (Entry, error) {
 	r.lino++
-	
+
 	e := Empty()
 	if r.err != nil {
 		return e, r.err
