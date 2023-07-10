@@ -67,7 +67,7 @@ func parsePrint(pattern string) (printfunc, error) {
 			}
 			switch char {
 			case 't':
-				format, err := parseTimeFormat(str)
+				format, _, err := parseTimeFormat(str)
 				if err != nil {
 					return nil, err
 				}

@@ -94,11 +94,11 @@ func parseSpecifier(str *scanner) (parsefunc, error) {
 	char := str.read()
 	switch char {
 	case 't':
-		format, err := parseTimeFormat(str)
+		format, size, err := parseTimeFormat(str)
 		if err != nil {
 			return nil, err
 		}
-		return getWhen(format), nil
+		return getWhen(format, size), nil
 	case 'b':
 		return getBlank, nil
 	case 'n':
@@ -282,7 +282,7 @@ func getBlank(_ *Entry, str *scanner) error {
 }
 
 func getMessage(e *Entry, str *scanner) error {
-	e.Message = str.readLiteral()
+	e.Message = str.readAll()
 	return nil
 }
 
@@ -297,10 +297,10 @@ func getWord(name string) parsefunc {
 	}
 }
 
-func getWhen(format string) parsefunc {
+func getWhen(format string, size int) parsefunc {
 	return func(e *Entry, str *scanner) error {
 		var err error
-		for i := len(format); i >= len(format)/2; i-- {
+		for i := len(format); i >= size; i-- {
 			str.save()
 			e.When, err = time.Parse(format, str.readN(i))
 			if err == nil {

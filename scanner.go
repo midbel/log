@@ -97,7 +97,7 @@ func (s *scanner) readBlank() {
 }
 
 func (s *scanner) readAll() string {
-	return s.readUntil(isEOL)
+	return s.readUntil(func(r rune) bool { return !isEOL(r) })
 }
 
 func (s *scanner) read() rune {

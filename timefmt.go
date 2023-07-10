@@ -8,19 +8,20 @@ import (
 	"time"
 )
 
-func parseTimeFormat(str *scanner) (string, error) {
+func parseTimeFormat(str *scanner) (string, int, error) {
 	if k := str.peek(); k != '(' {
-		return defaultTimeFormat, nil
+		return defaultTimeFormat, 0, nil
 	}
 	str.read()
 	var (
 		tmp  bytes.Buffer
 		res  bytes.Buffer
 		char rune
+		size int
 	)
 	for !str.done() {
 		if char = str.read(); isEOL(char) {
-			return "", fmt.Errorf("%w: missing ')'", ErrSyntax)
+			return "", 0, fmt.Errorf("%w: missing ')'", ErrSyntax)
 		} else if char == ')' {
 			break
 		}
@@ -29,7 +30,8 @@ func parseTimeFormat(str *scanner) (string, error) {
 			match := timeCodes.Lookup(tmp.Bytes(), -1)
 			if len(match) > 0 {
 				code := timeMapping[tmp.String()]
-				res.WriteString(code)
+				res.WriteString(code.Fmt)
+				size += code.Len
 			}
 			res.WriteRune(char)
 			tmp.Reset()
@@ -38,41 +40,62 @@ func parseTimeFormat(str *scanner) (string, error) {
 		tmp.WriteRune(char)
 		switch match := timeCodes.Lookup(tmp.Bytes(), -1); {
 		case len(match) == 1:
-			res.WriteString(timeMapping[tmp.String()])
+			code := timeMapping[tmp.String()]
+			size += code.Len
+			res.WriteString(code.Fmt)
 			tmp.Reset()
 		case len(match) == 0 && prev != "":
-			res.WriteString(timeMapping[prev])
+			code := timeMapping[prev]
+			size += code.Len
+			res.WriteString(code.Fmt)
 			res.WriteRune(char)
 			tmp.Reset()
 		default:
 			// pass
 		}
 	}
-	return res.String(), nil
+	return res.String(), size, nil
 }
 
 var timeCodes = indexArray(timeMapping)
 
-var timeMapping = map[string]string{
-	"yy":   "06",   // year 2 digits
-	"yyyy": "2006", // year 4 digits
-	"m":    "1",    // month no padding
-	"mm":   "01",   // month 2 digits zero padded
-	"mmm":  "Jan",  // abbr month name
-	"ccc":  "Mon",  // abbr day of week name
-	"d":    "2",    // day of month no padding
-	"dd":   "02",   // day of month 2 digits zero padded
-	"ddd":  "002",  // day of year 3 digits zero padded
-	"h":    "3",    // hour of day zero padding 0-12
-	"hh":   "03",   // hour of day 2 digits zero padding 0-12
-	// "H":    "",     // hour of day no padding 0-24
-	"HH":   "15",   // hour of day zero padding 0-24
-	"M":    "4",    // minute of hour no padding
-	"MM":   "04",   // minute of hour 2 digits zero padding
-	"s":    "5",    // second of minute no padding
-	"ss":   "05",   // second of minute 2 digits zero padding
-	"S":    "0",    // milliseconds
-	"SSS":  "000",  // milliseconds
+type timeFormatLen struct {
+	Len int
+	Fmt string
+}
+
+func makeFormatLen(str string, size int) timeFormatLen {
+	if size == 0 {
+		size = len(str)
+	}
+	return timeFormatLen{
+		Len: size,
+		Fmt: str,
+	}
+}
+
+var timeMapping = map[string]timeFormatLen{
+	"yy":   makeFormatLen("06", 2),   // year 2 digits
+	"yyyy": makeFormatLen("2006", 4), // year 4 digits
+	"m":    makeFormatLen("1", 1),    // month no padding
+	"mm":   makeFormatLen("01", 2),   // month 2 digits zero padded
+	"mmm":  makeFormatLen("Jan", 3),  // abbr month name
+	"ccc":  makeFormatLen("Mon", 3),  // abbr day of week name
+	"d":    makeFormatLen("_2", 1),    // day of month space padding
+	"dd":   makeFormatLen("02", 2),   // day of month 2 digits zero padded
+	"ddd":  makeFormatLen("002", 3),  // day of year 3 digits zero padded
+	"h":    makeFormatLen("_3", 1),    // hour of day space padding 0-12
+	"hh":   makeFormatLen("03", 2),   // hour of day 2 digits zero padding 0-12
+	// "H":    "",       // hour of day no padding 0-24
+	"HH":  makeFormatLen("15", 2),     // hour of day zero padding 0-24
+	"M":   makeFormatLen("4", 1),      // minute of hour no padding
+	"MM":  makeFormatLen("04", 2),     // minute of hour 2 digits zero padding
+	"s":   makeFormatLen("5", 1),      // second of minute no padding
+	"ss":  makeFormatLen("05", 2),     // second of minute 2 digits zero padding
+	"S":   makeFormatLen("0", 1),      // milliseconds
+	"SSS": makeFormatLen("000", 3),    // milliseconds
+	"ZZ":  makeFormatLen("Z07:00", 6), // timezone offset
+	"ZZZ": makeFormatLen("Z0700", 5),  // timezone offset
 }
 
 func indexArray[T any](in map[string]T) *suffixarray.Index {
