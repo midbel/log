@@ -19,14 +19,19 @@ func main() {
 	)
 	flag.Parse()
 
-	r, err := os.Open(flag.Arg(0))
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
-	}
-	defer r.Close()
+	var in = os.Stdin
 
-	rs, err := log.NewReader(r, *inpat, *filter)
+	if flag.NArg() > 0 {
+		r, err := os.Open(flag.Arg(0))
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
+		defer r.Close()
+		in = r
+	}
+
+	rs, err := log.NewReader(in, *inpat, *filter)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
