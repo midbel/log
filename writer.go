@@ -6,10 +6,6 @@ import (
 	"io"
 )
 
-var defaultPrintFormat = map[string]string{
-	"": "%t(mmm dd HH:MM:ss) %u %n[%p]: %m",
-}
-
 type Writer interface {
 	Write(Entry) error
 }
@@ -39,7 +35,7 @@ type textWriter struct {
 }
 
 func Text(ws io.Writer, pattern string) (Writer, error) {
-	if str, ok := defaultPrintFormat[pattern]; ok {
+	if str, ok := resolvePrintFormat(pattern); ok {
 		pattern = str
 	}
 	print, err := parsePrint(pattern)

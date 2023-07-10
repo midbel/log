@@ -2,7 +2,6 @@ package log
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -30,33 +29,6 @@ const (
 	defaultHostFormat = "hostname"
 )
 
-var (
-	ErrPattern = errors.New("invalid pattern")
-	ErrSyntax  = errors.New("syntax error")
-)
-
-type Entry struct {
-	Lino int    `json:"-"`
-	Line string `json:"-"`
-
-	Pid     int               `json:"pid,omitempty"`
-	Process string            `json:"process,omitempty"`
-	User    string            `json:"user,omitempty"`
-	Group   string            `json:"group,omitempty"`
-	Level   string            `json:"level,omitempty"`
-	Message string            `json:"message,omitempty"`
-	Words   []string          `json:"-"`
-	Named   map[string]string `json:"-"`
-	Host    string            `json:"hostname,omitempty"`
-	When    time.Time         `json:"time,omitempty"`
-}
-
-func Empty() Entry {
-	var e Entry
-	e.Named = make(map[string]string)
-	return e
-}
-
 type (
 	parsefunc func(*Entry, *scanner) error
 	hostfunc  func(*scanner) (string, error)
@@ -65,9 +37,6 @@ type (
 func parseFormat(pattern string) (parsefunc, error) {
 	if pattern == "" {
 		return nil, fmt.Errorf("%w: empty pattern not allowed", ErrSyntax)
-	}
-	if str, ok := defaultParseFormat[pattern]; ok {
-		pattern = str
 	}
 	var (
 		pfs []parsefunc

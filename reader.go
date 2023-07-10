@@ -6,10 +6,6 @@ import (
 	"io"
 )
 
-var defaultParseFormat = map[string]string{
-	"": "%t(mmm dd HH:MM:ss) %u %n[%p]: %m",
-}
-
 type Reader struct {
 	inner *bufio.Scanner
 	err   error
@@ -20,7 +16,7 @@ type Reader struct {
 }
 
 func NewReader(rs io.Reader, pattern, filter string) (*Reader, error) {
-	if str, ok := defaultParseFormat[pattern]; ok {
+	if str, ok := resolveParseFormat(pattern); ok {
 		pattern = str
 	}
 	var (
