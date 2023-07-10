@@ -6,7 +6,9 @@ import (
 	"io"
 )
 
-var defaultPrintFormat = map[string]string{}
+var defaultPrintFormat = map[string]string{
+	"": "%t(mmm dd HH:MM:ss) %u %n[%p]: %m",
+}
 
 type Writer interface {
 	Write(Entry) error

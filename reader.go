@@ -6,7 +6,9 @@ import (
 	"io"
 )
 
-var defaultParseFormat = map[string]string{}
+var defaultParseFormat = map[string]string{
+	"": "%t(mmm dd HH:MM:ss) %u %n[%p]: %m",
+}
 
 type Reader struct {
 	inner *bufio.Scanner

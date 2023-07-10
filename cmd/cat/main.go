@@ -10,15 +10,10 @@ import (
 	"github.com/midbel/log"
 )
 
-var (
-	input  = "[%t] [%h(%4:%p)]%b%u:%g:%n [%p:%l]:%b%m"
-	output = "%t %n[%p]: %m"
-)
-
 func main() {
 	var (
-		in      = flag.String("i", "", "input pattern")
-		out     = flag.String("o", "", "output pattern")
+		inpat   = flag.String("i", "", "input pattern")
+		outpat  = flag.String("o", "", "output pattern")
 		filter  = flag.String("f", "", "filter log entry")
 		jsonify = flag.Bool("j", false, "jsonify results")
 	)
@@ -31,12 +26,12 @@ func main() {
 	}
 	defer r.Close()
 
-	rs, err := log.NewReader(r, *in, *filter)
+	rs, err := log.NewReader(r, *inpat, *filter)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	err = toLog(rs, *out, *jsonify)
+	err = toLog(rs, *outpat, *jsonify)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
