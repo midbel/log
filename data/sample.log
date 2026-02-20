@@ -1,6 +1,0 @@
-[localhost:0509] INFO: 2023-07-06 19:42:12 midbel manual[15631]: create file
-[localhost:0509] INFO: 2023-07-06 19:42:13 midbel manual[15631]: duplicate line
-[localhost:0509] INFO: 2023-07-06 19:42:17 midbel manual[15631]: all done
-WARN:Sun, 09 Jul 2023 19:28:57: midbel mixed(1021): line #1
-DEBUG:Sun, 09 Jul 2023 19:28:59: midbel mixed(1021): debug expected
-WARN:Sun, 09 Jul 2023 19:29:01: midbel mixed(1021): line #2

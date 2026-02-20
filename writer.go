@@ -10,25 +10,6 @@ type Writer interface {
 	Write(Entry) error
 }
 
-type jsonWriter struct {
-	encoder *json.Encoder
-}
-
-func Json(ws io.Writer, compact bool) (Writer, error) {
-	e := json.NewEncoder(ws)
-	if !compact {
-		e.SetIndent("", "  ")
-	}
-	w := jsonWriter{
-		encoder: e,
-	}
-	return &w, nil
-}
-
-func (w *jsonWriter) Write(e Entry) error {
-	return w.encoder.Encode(e)
-}
-
 type textWriter struct {
 	inner *bufio.Writer
 	print printfunc

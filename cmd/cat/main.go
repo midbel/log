@@ -15,7 +15,6 @@ func main() {
 		inpat   = flag.String("i", "", "input pattern")
 		outpat  = flag.String("o", "", "output pattern")
 		filter  = flag.String("f", "", "filter log entry")
-		jsonify = flag.Bool("j", false, "jsonify results")
 	)
 	flag.Parse()
 
@@ -43,20 +42,12 @@ func main() {
 	}
 }
 
-func toLog(rs *log.Reader, format string, jsonify bool) error {
-	var (
-		ws  log.Writer
-		err error
-	)
-	if jsonify {
-		ws, _ = log.Json(os.Stdout, true)
-	} else {
-		ws, err = log.Text(os.Stdout, format)
-	}
+func toLog(rs *log.Reader, format string) error {
+	ws, err := log.Text(os.Stdout, format)
 	if err != nil {
 		return err
 	}
-	for i := 1; ; i++ {
+	for {
 		e, err := rs.Read()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
