@@ -34,14 +34,22 @@ func NewReader(rs io.Reader, pattern, filter string) (*Reader, error) {
 	return &r, nil
 }
 
-func (r *Reader) ReadAll() ([]Entry, error) {
+func (r *Reader) Read() ([]string, error) {
+	e, err := r.Next()
+	if err != nil {
+		return nil, err
+	}
+	return toStringArray(e), nil
+}
+
+func (r *Reader) All() ([]Entry, error) {
 	var (
 		es  []Entry
 		e   Entry
 		err error
 	)
 	for {
-		e, err = r.Read()
+		e, err = r.Next()
 		if err != nil {
 			break
 		}
@@ -50,7 +58,7 @@ func (r *Reader) ReadAll() ([]Entry, error) {
 	return es, err
 }
 
-func (r *Reader) Read() (Entry, error) {
+func (r *Reader) Next() (Entry, error) {
 	r.lino++
 
 	e := Empty()

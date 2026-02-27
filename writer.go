@@ -2,7 +2,6 @@ package log
 
 import (
 	"bufio"
-	"encoding/json"
 	"io"
 )
 

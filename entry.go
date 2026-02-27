@@ -2,6 +2,7 @@ package log
 
 import (
 	"errors"
+	"strconv"
 	"time"
 )
 
@@ -37,23 +38,37 @@ var (
 )
 
 type Entry struct {
-	Lino int    `json:"-"`
-	Line string `json:"-"`
+	Lino int    
+	Line string 
 
-	Pid     int               `json:"pid,omitempty"`
-	Process string            `json:"process,omitempty"`
-	User    string            `json:"user,omitempty"`
-	Group   string            `json:"group,omitempty"`
-	Level   string            `json:"level,omitempty"`
-	Message string            `json:"message,omitempty"`
-	Words   []string          `json:"-"`
-	Named   map[string]string `json:"-"`
-	Host    string            `json:"hostname,omitempty"`
-	When    time.Time         `json:"time,omitempty"`
+	Pid     int               
+	Process string            
+	User    string            
+	Group   string            
+	Level   string            
+	Message string            
+	Words   []string          
+	Named   map[string]string 
+	Host    string            
+	When    time.Time         
 }
 
 func Empty() Entry {
 	var e Entry
 	e.Named = make(map[string]string)
 	return e
+}
+
+func toStringArray(e Entry) []string {
+	return []string{
+		strconv.Itoa(e.Lino),
+		e.When.Format(time.RFC3339),
+		e.Host,
+		strconv.Itoa(e.Pid),
+		e.Process,
+		e.Level,
+		e.User,
+		e.Group,
+		e.Message,
+	}
 }

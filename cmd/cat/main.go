@@ -48,7 +48,7 @@ func toLog(rs *log.Reader, format string) error {
 		return err
 	}
 	for {
-		e, err := rs.Read()
+		e, err := rs.Next()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				break
