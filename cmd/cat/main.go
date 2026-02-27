@@ -12,9 +12,9 @@ import (
 
 func main() {
 	var (
-		inpat   = flag.String("i", "", "input pattern")
-		outpat  = flag.String("o", "", "output pattern")
-		filter  = flag.String("f", "", "filter log entry")
+		inpat  = flag.String("i", "", "input pattern")
+		outpat = flag.String("o", "", "output pattern")
+		filter = flag.String("f", "", "filter log entry")
 	)
 	flag.Parse()
 
@@ -35,7 +35,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	err = toLog(rs, *outpat, *jsonify)
+	err = toLog(rs, *outpat)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)

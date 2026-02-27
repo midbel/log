@@ -81,10 +81,10 @@ var timeMapping = map[string]timeFormatLen{
 	"mm":   makeFormatLen("01", 2),   // month 2 digits zero padded
 	"mmm":  makeFormatLen("Jan", 3),  // abbr month name
 	"ccc":  makeFormatLen("Mon", 3),  // abbr day of week name
-	"d":    makeFormatLen("_2", 1),    // day of month space padding
+	"d":    makeFormatLen("_2", 1),   // day of month space padding
 	"dd":   makeFormatLen("02", 2),   // day of month 2 digits zero padded
 	"ddd":  makeFormatLen("002", 3),  // day of year 3 digits zero padded
-	"h":    makeFormatLen("_3", 1),    // hour of day space padding 0-12
+	"h":    makeFormatLen("_3", 1),   // hour of day space padding 0-12
 	"hh":   makeFormatLen("03", 2),   // hour of day 2 digits zero padding 0-12
 	// "H":    "",       // hour of day no padding 0-24
 	"HH":  makeFormatLen("15", 2),     // hour of day zero padding 0-24

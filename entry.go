@@ -38,19 +38,19 @@ var (
 )
 
 type Entry struct {
-	Lino int    
-	Line string 
+	Lino int
+	Line string
 
-	Pid     int               
-	Process string            
-	User    string            
-	Group   string            
-	Level   string            
-	Message string            
-	Words   []string          
-	Named   map[string]string 
-	Host    string            
-	When    time.Time         
+	Pid     int
+	Process string
+	User    string
+	Group   string
+	Level   string
+	Message string
+	Words   []string
+	Named   map[string]string
+	Host    string
+	When    time.Time
 }
 
 func Empty() Entry {

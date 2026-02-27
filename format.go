@@ -308,7 +308,6 @@ func getWhen(format string, size int) parsefunc {
 			}
 			str.restore()
 		}
-		//e.When, err = time.Parse(format, str.readN(len(format)))
 		if err != nil {
 			err = ErrPattern
 		}
