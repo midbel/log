@@ -2,7 +2,6 @@ package log
 
 import (
 	"errors"
-	"time"
 )
 
 var commonFormat = map[string]string{
@@ -17,28 +16,6 @@ var (
 type LogField struct {
 	Name  string
 	Value string
-}
-
-type Entry struct {
-	Lino int
-	Line string
-
-	Pid     int
-	Process string
-	User    string
-	Group   string
-	Level   string
-	Message string
-	Words   []string
-	Named   map[string]string
-	Host    string
-	When    time.Time
-}
-
-func Empty() Entry {
-	var e Entry
-	e.Named = make(map[string]string)
-	return e
 }
 
 var defaultParseFormat = map[string]string{}

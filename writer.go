@@ -6,7 +6,7 @@ import (
 )
 
 type Writer interface {
-	Write(Entry) error
+	Write([]LogField) error
 }
 
 type textWriter struct {
@@ -29,8 +29,8 @@ func Text(ws io.Writer, pattern string) (Writer, error) {
 	return &w, nil
 }
 
-func (w *textWriter) Write(e Entry) error {
-	w.print(e, w.inner)
+func (w *textWriter) Write(fs []LogField) error {
+	w.print(fs, w.inner)
 	w.inner.WriteRune('\n')
 	return w.inner.Flush()
 }

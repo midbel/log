@@ -42,31 +42,8 @@ func (r *Reader) Read() ([]string, error) {
 	return rs, nil
 }
 
-func (r *Reader) All() ([]Entry, error) {
-	var (
-		es  []Entry
-		e   Entry
-		err error
-	)
-	for {
-		e, err = r.Next()
-		if err != nil {
-			break
-		}
-		es = append(es, e)
-	}
-	return es, err
-}
-
-func (r *Reader) Next() (Entry, error) {
-	e := Empty()
-	fs, err := r.readNext()
-
-	if err != nil {
-		return e, err
-	}
-	_ = fs
-	return e, nil
+func (r *Reader) Next() ([]LogField, error) {
+	return r.readNext()
 }
 
 func (r *Reader) readNext() ([]LogField, error) {

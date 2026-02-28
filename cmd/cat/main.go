@@ -46,36 +46,15 @@ func toLog(rs *log.Reader, format string) error {
 	if err != nil {
 		return err
 	}
-	_ = ws
 	for {
-		fs, err := rs.Read()
+		fs, err := rs.Next()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				break
 			}
 			return err
 		}
-		fmt.Println(fs)
-	}
-	return nil
-}
-
-func toLog2(rs *log.Reader, format string) error {
-	ws, err := log.Text(os.Stdout, format)
-	if err != nil {
-		return err
-	}
-	for {
-		e, err := rs.Next()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			return err
-		}
-		if err := ws.Write(e); err != nil {
-			return err
-		}
+		ws.Write(fs)
 	}
 	return nil
 }

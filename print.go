@@ -4,16 +4,16 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 )
 
-type printfunc func(Entry, io.StringWriter)
+type printfunc func([]LogField, io.StringWriter)
 
 // line specifiers (writing)
 // format %[w][[fg:bg]]c
-// %d
 // %t: time
 // %n: process
 // %p: pid
@@ -22,7 +22,6 @@ type printfunc func(Entry, io.StringWriter)
 // %h: host
 // %l: level
 // %m: message
-// %#: line
 // %[digit]: word
 // %%: a percent sign
 // c : any character(s)
@@ -86,10 +85,6 @@ func parsePrint(pattern string) (printfunc, error) {
 				info.Func = printLevel
 			case 'm':
 				info.Func = printMessage
-			case '#':
-				info.Func = printLine
-			case 'd':
-				info.Func = printLino
 			case 'w':
 				info.Func = printName("")
 			default:
@@ -129,7 +124,7 @@ func infoFromFunc(fn printfunc) printinfo {
 	}
 }
 
-func (p printinfo) Print(e Entry, w io.StringWriter) {
+func (p printinfo) Print(fs []LogField, w io.StringWriter) {
 	if code := foregroundAnsiCodes[p.Fore]; code != "" {
 		w.WriteString(code)
 	}
@@ -143,7 +138,7 @@ func (p printinfo) Print(e Entry, w io.StringWriter) {
 	if p.Width > 0 {
 		ws = &tmp
 	}
-	p.Func(e, ws)
+	p.Func(fs, ws)
 	if p.Width > 0 {
 		diff := p.Width - tmp.Len()
 		if diff > 0 {
@@ -162,39 +157,28 @@ func mergePrint(pfs []printinfo) printfunc {
 	if len(pfs) == 1 {
 		return pfs[0].Print
 	}
-	return func(e Entry, w io.StringWriter) {
+	return func(fs []LogField, w io.StringWriter) {
 		for _, p := range pfs {
-			p.Print(e, w)
+			p.Print(fs, w)
 		}
 	}
 }
 
-func printLino(e Entry, w io.StringWriter) {
-	w.WriteString(strconv.Itoa(e.Lino))
-}
-
 func printLiteral(str string) printfunc {
-	return func(_ Entry, w io.StringWriter) {
-		printString(str, w)
+	return func(_ []LogField, w io.StringWriter) {
+		w.WriteString(str)
 	}
 }
 
 func printWord(i int) printfunc {
-	return func(e Entry, w io.StringWriter) {
-		var str string
-		if i >= 0 && i < len(e.Words) {
-			str = e.Words[i]
-		}
-		printString(str, w)
+	return func(fs []LogField, w io.StringWriter) {
+
 	}
 }
 
 func printName(name string) printfunc {
-	return func(e Entry, w io.StringWriter) {
-		if name == "" {
-			return
-		}
-		printString(e.Named[name], w)
+	return func(fs []LogField, w io.StringWriter) {
+
 	}
 }
 
@@ -202,56 +186,46 @@ func printTime(format string) printfunc {
 	if format == "" {
 		format = time.RFC3339
 	}
-	return func(e Entry, w io.StringWriter) {
-		var str string
-		if !e.When.IsZero() {
-			str = e.When.Format(format)
-		}
-		printString(str, w)
+	return func(fs []LogField, w io.StringWriter) {
+		printField(fs, "t", w)
 	}
 }
 
-func printProcess(e Entry, w io.StringWriter) {
-	printString(e.Process, w)
+func printProcess(fs []LogField, w io.StringWriter) {
+	printField(fs, "n", w)
 }
 
-func printPID(e Entry, w io.StringWriter) {
-	var str string
-	if e.Pid > 0 {
-		str = strconv.Itoa(e.Pid)
+func printPID(fs []LogField, w io.StringWriter) {
+	printField(fs, "p", w)
+}
+
+func printUser(fs []LogField, w io.StringWriter) {
+	printField(fs, "u", w)
+}
+
+func printGroup(fs []LogField, w io.StringWriter) {
+	printField(fs, "g", w)
+}
+
+func printHost(fs []LogField, w io.StringWriter) {
+	printField(fs, "h", w)
+}
+
+func printLevel(fs []LogField, w io.StringWriter) {
+	printField(fs, "l", w)
+}
+
+func printMessage(fs []LogField, w io.StringWriter) {
+	printField(fs, "m", w)
+}
+
+func printField(fs []LogField, field string, w io.StringWriter) {
+	ix := slices.IndexFunc(fs, func(lf LogField) bool {
+		return lf.Name == field && lf.Value != ""
+	})
+	if ix >= 0 {
+		w.WriteString(fs[ix].Value)
 	}
-	printString(str, w)
-}
-
-func printUser(e Entry, w io.StringWriter) {
-	printString(e.User, w)
-}
-
-func printGroup(e Entry, w io.StringWriter) {
-	printString(e.Group, w)
-}
-
-func printHost(e Entry, w io.StringWriter) {
-	printString(e.Host, w)
-}
-
-func printLevel(e Entry, w io.StringWriter) {
-	printString(e.Level, w)
-}
-
-func printMessage(e Entry, w io.StringWriter) {
-	printString(e.Message, w)
-}
-
-func printLine(e Entry, w io.StringWriter) {
-	printString(e.Line, w)
-}
-
-func printString(str string, w io.StringWriter) {
-	if str == "" {
-		return
-	}
-	w.WriteString(str)
 }
 
 var resetAnsiCode = "\033[0m"
