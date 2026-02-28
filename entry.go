@@ -13,6 +13,12 @@ var (
 	ErrSyntax  = errors.New("syntax error")
 )
 
+type LogEntry struct {
+	Lino   int
+	Line   string
+	Fields []LogField
+}
+
 type LogField struct {
 	Name  string
 	Value string

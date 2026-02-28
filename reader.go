@@ -12,9 +12,10 @@ type Reader struct {
 
 	lino  int
 	parse []parsefunc
+	filter filterfunc
 }
 
-func NewReader(rs io.Reader, pattern string) (*Reader, error) {
+func NewReader(rs io.Reader, pattern, filter string) (*Reader, error) {
 	if str, ok := resolveParseFormat(pattern); ok {
 		pattern = str
 	}
@@ -27,36 +28,42 @@ func NewReader(rs io.Reader, pattern string) (*Reader, error) {
 	if r.parse, err = parseFormat(pattern); err != nil {
 		return nil, err
 	}
+	if r.filter, err = parseFilter(filter); err != nil {
+		return nil, err
+	}
 	return &r, nil
 }
 
 func (r *Reader) Read() ([]string, error) {
-	fs, err := r.readNext()
+	es, err := r.readNext()
 	if err != nil {
 		return nil, err
 	}
-	rs := make([]string, len(fs))
-	for i := range fs {
-		rs[i] = fs[i].Value
+	rs := make([]string, len(es.Fields))
+	for i := range es.Fields {
+		rs[i] = es.Fields[i].Value
 	}
 	return rs, nil
 }
 
 func (r *Reader) Next() ([]LogField, error) {
-	return r.readNext()
+	e, err := r.readNext()
+	return e.Fields, err
 }
 
-func (r *Reader) readNext() ([]LogField, error) {
+func (r *Reader) readNext() (LogEntry, error) {
+	var es LogEntry
 	if r.err != nil {
-		return nil, r.err
+		return es, r.err
 	}
+	r.lino++
 	for i := 1; ; i++ {
 		if !r.inner.Scan() {
 			r.err = r.inner.Err()
 			if r.err == nil {
 				r.err = io.EOF
 			}
-			return nil, r.err
+			return es, r.err
 		}
 		line := r.inner.Text()
 		if len(line) == 0 {
@@ -68,11 +75,18 @@ func (r *Reader) readNext() ([]LogField, error) {
 				continue
 			}
 			r.err = err
-			return nil, r.err
+			return es, r.err
 		}
-		return fs, nil
+		es = LogEntry {
+			Lino: r.lino,
+			Line: line,
+			Fields: fs,
+		}
+		if r.filter == nil || r.filter(es) {
+			break
+		}
 	}
-	return nil, r.err
+	return es, r.err
 }
 
 func (r *Reader) readLine(line string) ([]LogField, error) {

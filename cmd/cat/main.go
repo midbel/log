@@ -14,6 +14,7 @@ func main() {
 	var (
 		inpat  = flag.String("i", "", "input pattern")
 		outpat = flag.String("o", "", "output pattern")
+		filter = flag.String("f", "", "filter expression")
 	)
 	flag.Parse()
 
@@ -29,7 +30,7 @@ func main() {
 		in = r
 	}
 
-	rs, err := log.NewReader(in, *inpat)
+	rs, err := log.NewReader(in, *inpat, *filter)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

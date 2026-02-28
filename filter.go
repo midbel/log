@@ -1,5 +1,3 @@
-//go:build ignore
-
 package log
 
 import (
@@ -8,9 +6,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"slices"
 )
 
-type filterfunc func(LogField) bool
+type filterfunc func(LogEntry) bool
 
 // all(expr,...)
 // any(expr,...)
@@ -26,14 +25,14 @@ type filterfunc func(LogField) bool
 // between(field, value)
 func parseFilter(expr string) (filterfunc, error) {
 	if expr == "" {
-		return func(_ Entry) bool { return true }, nil
+		return func(_ LogEntry) bool { return true }, nil
 	}
 	str := scan(expr)
 	return parseFunction(str)
 }
 
 func makeAll(fs []filterfunc) filterfunc {
-	return func(lf LogField) bool {
+	return func(e LogEntry) bool {
 		for _, f := range fs {
 			if !f(e) {
 				return false
@@ -44,7 +43,7 @@ func makeAll(fs []filterfunc) filterfunc {
 }
 
 func makeAny(fs []filterfunc) filterfunc {
-	return func(lf LogField) bool {
+	return func(e LogEntry) bool {
 		for _, f := range fs {
 			if f(e) {
 				return true
@@ -55,7 +54,7 @@ func makeAny(fs []filterfunc) filterfunc {
 }
 
 func makeNot(f filterfunc) filterfunc {
-	return func(lf LogField) bool {
+	return func(e LogEntry) bool {
 		return !f(e)
 	}
 }
@@ -73,7 +72,7 @@ func makeEq(str *scanner) (filterfunc, error) {
 	if err != nil {
 		return nil, err
 	}
-	fn := func(lf LogField) bool {
+	fn := func(e LogEntry) bool {
 		set, err := getField(field, e)
 		return err == nil && equal(set, value)
 	}
@@ -85,7 +84,7 @@ func makeLt(str *scanner) (filterfunc, error) {
 	if err != nil {
 		return nil, err
 	}
-	fn := func(lf LogField) bool {
+	fn := func(e LogEntry) bool {
 		set, err := getField(field, e)
 		return err == nil && lessThan(set, value)
 	}
@@ -97,7 +96,7 @@ func makeLe(str *scanner) (filterfunc, error) {
 	if err != nil {
 		return nil, err
 	}
-	fn := func(lf LogField) bool {
+	fn := func(e LogEntry) bool {
 		set, err := getField(field, e)
 		return err == nil && (lessThan(set, value) || equal(set, value))
 	}
@@ -109,7 +108,7 @@ func makeGt(str *scanner) (filterfunc, error) {
 	if err != nil {
 		return nil, err
 	}
-	fn := func(lf LogField) bool {
+	fn := func(e LogEntry) bool {
 		set, err := getField(field, e)
 		return err == nil && !lessThan(set, value) && !equal(set, value)
 	}
@@ -121,7 +120,7 @@ func makeGe(str *scanner) (filterfunc, error) {
 	if err != nil {
 		return nil, err
 	}
-	fn := func(lf LogField) bool {
+	fn := func(e LogEntry) bool {
 		set, err := getField(field, e)
 		return err == nil && (!lessThan(set, value) || equal(set, value))
 	}
@@ -133,7 +132,7 @@ func makeLike(str *scanner) (filterfunc, error) {
 	if err != nil {
 		return nil, err
 	}
-	fn := func(lf LogField) bool {
+	fn := func(e LogEntry) bool {
 		set, err := getField(field, e)
 		if err != nil {
 			return false
@@ -151,7 +150,7 @@ func makeBetween(str *scanner) (filterfunc, error) {
 	if len(list) != 2 {
 		return nil, fmt.Errorf("too many values given for between")
 	}
-	fn := func(lf LogField) bool {
+	fn := func(e LogEntry) bool {
 		set, err := getField(field, e)
 		if err != nil {
 			return false
@@ -169,7 +168,7 @@ func makeIn(str *scanner) (filterfunc, error) {
 	if err != nil {
 		return nil, err
 	}
-	fn := func(lf LogField) bool {
+	fn := func(e LogEntry) bool {
 		set, err := getField(field, e)
 		if err != nil {
 			return false
@@ -211,29 +210,30 @@ func equal(val any, value string) bool {
 	}
 }
 
-func getField(field string, e Entry) (any, error) {
-	var set any
-	switch field {
-	case "hostname", "host":
-		set = e.Host
-	case "level":
-		set = e.Level
-	case "user":
-		set = e.User
-	case "group":
-		set = e.Group
-	case "pid":
-		set = e.Pid
-	case "process":
-		set = e.Process
-	case "message":
-		set = e.Message
-	case "time":
-		set = e.When
-	default:
-		return nil, fmt.Errorf("field %s not recognized", field)
+var mappingFields = map[string]string {
+	"hostname": "h",
+	"host": "h",
+	"level": "l",
+	"user": "u",
+	"group": "g",
+	"pid": "p",
+	"process": "n",
+	"message": "m",
+	"time": "t",
+}
+
+func getField(field string, e LogEntry) (any, error) {
+	n, ok := mappingFields[field]
+	if !ok {
+		return nil, fmt.Errorf("%s: unknown log field", field)
 	}
-	return set, nil
+	ix := slices.IndexFunc(e.Fields, func(f LogField) bool {
+		return f.Name == n && f.Value != ""
+	})
+	if ix < 0 {
+		return nil, fmt.Errorf("%s not defined", field)
+	}
+	return e.Fields[ix].Value, nil
 }
 
 func parseFunction(str *scanner) (filterfunc, error) {
