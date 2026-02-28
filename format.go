@@ -3,7 +3,6 @@ package log
 import (
 	"bytes"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -30,36 +29,33 @@ const (
 )
 
 type (
-	parsefunc func(*Entry, *scanner) error
+	parsefunc func(*LogField, *scanner) error
 	hostfunc  func(*scanner) (string, error)
 )
 
-func parseFormat(pattern string) (parsefunc, error) {
+func parseFormat(pattern string) ([]parsefunc, error) {
 	if pattern == "" {
 		return nil, fmt.Errorf("%w: empty pattern not allowed", ErrSyntax)
 	}
-	var (
-		pfs []parsefunc
-		str = scan(pattern)
-	)
-	for !str.done() {
-		fn, err := parsePattern(str)
-		if err != nil {
-			return nil, err
-		}
-		pfs = append(pfs, fn)
+	str := scan(pattern)
+	pfs, err := parsePattern(scan(pattern))
+	if err != nil {
+		return nil, err
 	}
-	return mergeAlternative(pfs), nil
+	if !str.done() {
+		return nil, fmt.Errorf("end of pattern expected - token remains")
+	}
+	return pfs, nil
 }
 
-func parsePattern(str *scanner) (parsefunc, error) {
+func parsePattern(str *scanner) ([]parsefunc, error) {
 	var (
 		tmp bytes.Buffer
 		pfs []parsefunc
 	)
 	for {
 		char := str.read()
-		if str.done() || char == '|' {
+		if str.done() {
 			break
 		}
 		if char == utf8.RuneError {
@@ -87,7 +83,7 @@ func parsePattern(str *scanner) (parsefunc, error) {
 		in := tmp.String()
 		pfs = append(pfs, getLiteral(in))
 	}
-	return mergeParse(pfs), nil
+	return pfs, nil
 }
 
 func parseSpecifier(str *scanner) (parsefunc, error) {
@@ -218,96 +214,74 @@ func mergeHost(hfs []hostfunc) hostfunc {
 	}
 }
 
-func mergeAlternative(pfs []parsefunc) parsefunc {
-	if len(pfs) == 1 {
-		return pfs[0]
-	}
-	return func(e *Entry, str *scanner) error {
-		for _, pf := range pfs {
-			str.reset()
-			if err := pf(e, str); err == nil {
-				return nil
-			}
-		}
-		return ErrPattern
-	}
-}
-
-func mergeParse(pfs []parsefunc) parsefunc {
-	if len(pfs) == 1 {
-		return pfs[0]
-	}
-	return func(e *Entry, str *scanner) error {
-		for _, pf := range pfs {
-			if err := pf(e, str); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-}
-
-func getUser(e *Entry, str *scanner) error {
-	e.User = str.readLiteral()
+func getUser(lf *LogField, str *scanner) error {
+	lf.Name = "u"
+	lf.Value = str.readLiteral()
 	return nil
 }
 
-func getGroup(e *Entry, str *scanner) error {
-	e.Group = str.readLiteral()
+func getGroup(lf *LogField, str *scanner) error {
+	lf.Name = "g"
+	lf.Value = str.readLiteral()
 	return nil
 }
 
-func getProcess(e *Entry, str *scanner) error {
-	e.Process = str.readLiteral()
+func getProcess(lf *LogField, str *scanner) error {
+	lf.Name = "n"
+	lf.Value = str.readLiteral()
 	return nil
 }
 
-func getLevel(e *Entry, str *scanner) error {
-	e.Level = str.readLiteral()
+func getLevel(lf *LogField, str *scanner) error {
+	lf.Name = "l"
+	lf.Value = str.readLiteral()
 	return nil
 }
 
-func getPID(e *Entry, str *scanner) error {
-	var (
-		pid = str.readLiteral()
-		err error
-	)
-	e.Pid, err = strconv.Atoi(pid)
-	return err
+func getPID(lf *LogField, str *scanner) error {
+	lf.Name = "p"
+	lf.Value = str.readLiteral()
+	return nil
 }
 
-func getBlank(_ *Entry, str *scanner) error {
+func getBlank(_ *LogField, str *scanner) error {
 	str.readBlank()
 	return nil
 }
 
-func getMessage(e *Entry, str *scanner) error {
-	e.Message = str.readAll()
+func getMessage(lf *LogField, str *scanner) error {
+	lf.Name = "m"
+	lf.Value = str.readAll()
 	return nil
 }
 
 func getWord(name string) parsefunc {
-	return func(e *Entry, str *scanner) error {
-		word := str.readLiteral()
-		if name != "" && e.Named != nil {
-			e.Named[name] = word
-		}
-		e.Words = append(e.Words, word)
+	return func(lf *LogField, str *scanner) error {
+		lf.Name = "w"
+		lf.Value = str.readLiteral()
 		return nil
 	}
 }
 
 func getWhen(format string, size int) parsefunc {
-	return func(e *Entry, str *scanner) error {
-		var err error
+	return func(lf *LogField, str *scanner) error {
+		lf.Name = "t"
+
+		var (
+			when time.Time
+			err  error
+		)
 		for i := len(format); i >= size; i-- {
 			str.save()
-			e.When, err = time.Parse(format, str.readN(i))
+			input := str.readN(i)
+			when, err = time.Parse(format, input)
 			if err == nil {
+				lf.Value = input
 				break
 			}
 			str.restore()
 		}
+		_ = when
 		if err != nil {
 			err = ErrPattern
 		}
@@ -316,22 +290,25 @@ func getWhen(format string, size int) parsefunc {
 }
 
 func getHost(get hostfunc) parsefunc {
-	fn := func(e *Entry, str *scanner) error {
+	fn := func(lf *LogField, str *scanner) error {
 		var err error
-		e.Host, err = get(str)
+		lf.Name = "h"
+		lf.Value, err = get(str)
 		return err
 	}
 	return fn
 }
 
 func getLiteral(in string) parsefunc {
-	return func(_ *Entry, str *scanner) error {
+	return func(lf *LogField, str *scanner) error {
 		for _, curr := range in {
 			char := str.read()
 			if curr != char {
 				return charactersMismatch(curr, char)
 			}
 		}
+		// lf.Name = "*"
+		// lf.Value = in
 		return nil
 	}
 }

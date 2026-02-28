@@ -1,3 +1,5 @@
+//go:build ignore
+
 package log
 
 import (
@@ -8,7 +10,7 @@ import (
 	"time"
 )
 
-type filterfunc func(Entry) bool
+type filterfunc func(LogField) bool
 
 // all(expr,...)
 // any(expr,...)
@@ -31,7 +33,7 @@ func parseFilter(expr string) (filterfunc, error) {
 }
 
 func makeAll(fs []filterfunc) filterfunc {
-	return func(e Entry) bool {
+	return func(lf LogField) bool {
 		for _, f := range fs {
 			if !f(e) {
 				return false
@@ -42,7 +44,7 @@ func makeAll(fs []filterfunc) filterfunc {
 }
 
 func makeAny(fs []filterfunc) filterfunc {
-	return func(e Entry) bool {
+	return func(lf LogField) bool {
 		for _, f := range fs {
 			if f(e) {
 				return true
@@ -53,7 +55,7 @@ func makeAny(fs []filterfunc) filterfunc {
 }
 
 func makeNot(f filterfunc) filterfunc {
-	return func(e Entry) bool {
+	return func(lf LogField) bool {
 		return !f(e)
 	}
 }
@@ -71,7 +73,7 @@ func makeEq(str *scanner) (filterfunc, error) {
 	if err != nil {
 		return nil, err
 	}
-	fn := func(e Entry) bool {
+	fn := func(lf LogField) bool {
 		set, err := getField(field, e)
 		return err == nil && equal(set, value)
 	}
@@ -83,7 +85,7 @@ func makeLt(str *scanner) (filterfunc, error) {
 	if err != nil {
 		return nil, err
 	}
-	fn := func(e Entry) bool {
+	fn := func(lf LogField) bool {
 		set, err := getField(field, e)
 		return err == nil && lessThan(set, value)
 	}
@@ -95,7 +97,7 @@ func makeLe(str *scanner) (filterfunc, error) {
 	if err != nil {
 		return nil, err
 	}
-	fn := func(e Entry) bool {
+	fn := func(lf LogField) bool {
 		set, err := getField(field, e)
 		return err == nil && (lessThan(set, value) || equal(set, value))
 	}
@@ -107,7 +109,7 @@ func makeGt(str *scanner) (filterfunc, error) {
 	if err != nil {
 		return nil, err
 	}
-	fn := func(e Entry) bool {
+	fn := func(lf LogField) bool {
 		set, err := getField(field, e)
 		return err == nil && !lessThan(set, value) && !equal(set, value)
 	}
@@ -119,7 +121,7 @@ func makeGe(str *scanner) (filterfunc, error) {
 	if err != nil {
 		return nil, err
 	}
-	fn := func(e Entry) bool {
+	fn := func(lf LogField) bool {
 		set, err := getField(field, e)
 		return err == nil && (!lessThan(set, value) || equal(set, value))
 	}
@@ -131,7 +133,7 @@ func makeLike(str *scanner) (filterfunc, error) {
 	if err != nil {
 		return nil, err
 	}
-	fn := func(e Entry) bool {
+	fn := func(lf LogField) bool {
 		set, err := getField(field, e)
 		if err != nil {
 			return false
@@ -149,7 +151,7 @@ func makeBetween(str *scanner) (filterfunc, error) {
 	if len(list) != 2 {
 		return nil, fmt.Errorf("too many values given for between")
 	}
-	fn := func(e Entry) bool {
+	fn := func(lf LogField) bool {
 		set, err := getField(field, e)
 		if err != nil {
 			return false
@@ -167,7 +169,7 @@ func makeIn(str *scanner) (filterfunc, error) {
 	if err != nil {
 		return nil, err
 	}
-	fn := func(e Entry) bool {
+	fn := func(lf LogField) bool {
 		set, err := getField(field, e)
 		if err != nil {
 			return false

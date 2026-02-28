@@ -14,7 +14,6 @@ func main() {
 	var (
 		inpat  = flag.String("i", "", "input pattern")
 		outpat = flag.String("o", "", "output pattern")
-		filter = flag.String("f", "", "filter log entry")
 	)
 	flag.Parse()
 
@@ -30,7 +29,7 @@ func main() {
 		in = r
 	}
 
-	rs, err := log.NewReader(in, *inpat, *filter)
+	rs, err := log.NewReader(in, *inpat)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -43,6 +42,25 @@ func main() {
 }
 
 func toLog(rs *log.Reader, format string) error {
+	ws, err := log.Text(os.Stdout, format)
+	if err != nil {
+		return err
+	}
+	_ = ws
+	for {
+		fs, err := rs.Read()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+		fmt.Println(fs)
+	}
+	return nil
+}
+
+func toLog2(rs *log.Reader, format string) error {
 	ws, err := log.Text(os.Stdout, format)
 	if err != nil {
 		return err

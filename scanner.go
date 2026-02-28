@@ -9,6 +9,7 @@ import (
 type cursor struct {
 	curr int
 	next int
+	char rune
 }
 
 type scanner struct {
@@ -106,6 +107,7 @@ func (s *scanner) read() rune {
 	char, size := utf8.DecodeRuneInString(s.input[s.next:])
 	s.curr = s.next
 	s.next += size
+	s.char = char
 	return char
 }
 
@@ -131,7 +133,7 @@ func (s *scanner) peek() rune {
 }
 
 func (s *scanner) done() bool {
-	return s.curr >= len(s.input)
+	return s.char == utf8.RuneError || s.char == 0
 }
 
 func isDigit(r rune) bool {

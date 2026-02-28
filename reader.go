@@ -11,11 +11,10 @@ type Reader struct {
 	err   error
 
 	lino  int
-	keep  filterfunc
-	parse parsefunc
+	parse []parsefunc
 }
 
-func NewReader(rs io.Reader, pattern, filter string) (*Reader, error) {
+func NewReader(rs io.Reader, pattern string) (*Reader, error) {
 	if str, ok := resolveParseFormat(pattern); ok {
 		pattern = str
 	}
@@ -28,18 +27,19 @@ func NewReader(rs io.Reader, pattern, filter string) (*Reader, error) {
 	if r.parse, err = parseFormat(pattern); err != nil {
 		return nil, err
 	}
-	if r.keep, err = parseFilter(filter); err != nil {
-		return nil, err
-	}
 	return &r, nil
 }
 
 func (r *Reader) Read() ([]string, error) {
-	e, err := r.Next()
+	fs, err := r.readNext()
 	if err != nil {
 		return nil, err
 	}
-	return toStringArray(e), nil
+	rs := make([]string, len(fs))
+	for i := range fs {
+		rs[i] = fs[i].Value
+	}
+	return rs, nil
 }
 
 func (r *Reader) All() ([]Entry, error) {
@@ -59,11 +59,19 @@ func (r *Reader) All() ([]Entry, error) {
 }
 
 func (r *Reader) Next() (Entry, error) {
-	r.lino++
-
 	e := Empty()
+	fs, err := r.readNext()
+
+	if err != nil {
+		return e, err
+	}
+	_ = fs
+	return e, nil
+}
+
+func (r *Reader) readNext() ([]LogField, error) {
 	if r.err != nil {
-		return e, r.err
+		return nil, r.err
 	}
 	for i := 1; ; i++ {
 		if !r.inner.Scan() {
@@ -71,25 +79,39 @@ func (r *Reader) Next() (Entry, error) {
 			if r.err == nil {
 				r.err = io.EOF
 			}
-			return e, r.err
+			return nil, r.err
 		}
 		line := r.inner.Text()
 		if len(line) == 0 {
 			continue
 		}
-		err := r.parse(&e, scan(line))
+		fs, err := r.readLine(line)
 		if err != nil {
 			if errors.Is(err, ErrPattern) {
 				continue
 			}
 			r.err = err
-			return e, r.err
+			return nil, r.err
 		}
-		if r.keep == nil || r.keep(e) {
-			e.Line = line
-			e.Lino = r.lino
-			break
+		return fs, nil
+	}
+	return nil, r.err
+}
+
+func (r *Reader) readLine(line string) ([]LogField, error) {
+	var (
+		fs  = make([]LogField, 0, len(r.parse))
+		str = scan(line)
+	)
+	for i := range r.parse {
+		var lf LogField
+		err := r.parse[i](&lf, str)
+		if err != nil {
+			return nil, err
+		}
+		if lf.Name != "" && lf.Value != "" {
+			fs = append(fs, lf)
 		}
 	}
-	return e, r.err
+	return fs, nil
 }
