@@ -25,6 +25,15 @@ type PrintSpecifier struct {
 	print printfunc
 }
 
+func (p PrintSpecifier) structurable() bool {
+	switch p.Char {
+	case 't', 'n', 'p', 'l', 'u', 'g', 'h', 'm':
+		return true
+	default:
+		return false
+	}
+}
+
 func PrintTime(format string) PrintSpecifier {
 	return createPrint("time", 't', printTime(format))
 }

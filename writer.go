@@ -67,7 +67,7 @@ func (w *StructuredWriter) Attach(spec PrintSpecifier) {
 
 func (w *StructuredWriter) Write(fs []LogField) error {
 	for _, ps := range w.specifiers {
-		if ps.Char != 'w' && ps.Char != 'b' {
+		if ps.structurable() && ps.Name != "" {
 			io.WriteString(w.inner, ps.Name)
 			io.WriteString(w.inner, "=")
 		}

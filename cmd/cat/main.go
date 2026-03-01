@@ -12,9 +12,9 @@ import (
 
 func main() {
 	var (
-		inpat  = flag.String("i", "", "input pattern")
-		outpat = flag.String("o", "", "output pattern")
-		filter = flag.String("f", "", "filter expression")
+		inpat      = flag.String("i", "", "input pattern")
+		outpat     = flag.String("o", "", "output pattern")
+		filter     = flag.String("f", "", "filter expression")
 		structured = flag.Bool("s", false, "use structured output")
 	)
 	flag.Parse()
@@ -56,7 +56,7 @@ func main() {
 
 func toLog(rs log.Reader, structured bool, format string) error {
 	var (
-		ws log.Writer
+		ws  log.Writer
 		err error
 	)
 	if structured {
