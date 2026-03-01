@@ -2,12 +2,16 @@ package log
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
-	"slices"
 )
+
+type Predicate interface {
+	Accept(LogEntry) bool
+}
 
 type filterfunc func(LogEntry) bool
 
@@ -23,7 +27,7 @@ type filterfunc func(LogEntry) bool
 // in(field, value)
 // like(field, value)
 // between(field, value)
-func parseFilter(expr string) (filterfunc, error) {
+func ParseFilter(expr string) (filterfunc, error) {
 	if expr == "" {
 		return func(_ LogEntry) bool { return true }, nil
 	}
@@ -210,16 +214,16 @@ func equal(val any, value string) bool {
 	}
 }
 
-var mappingFields = map[string]string {
+var mappingFields = map[string]string{
 	"hostname": "h",
-	"host": "h",
-	"level": "l",
-	"user": "u",
-	"group": "g",
-	"pid": "p",
-	"process": "n",
-	"message": "m",
-	"time": "t",
+	"host":     "h",
+	"level":    "l",
+	"user":     "u",
+	"group":    "g",
+	"pid":      "p",
+	"process":  "n",
+	"message":  "m",
+	"time":     "t",
 }
 
 func getField(field string, e LogEntry) (any, error) {

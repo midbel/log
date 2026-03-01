@@ -6,13 +6,17 @@ import (
 	"io"
 )
 
+// type Reader interface {
+// 	Next() (LogEntry, error)
+// }
+
 type Reader struct {
 	inner *bufio.Scanner
 	err   error
 
-	lino  int
-	parse []parsefunc
-	filter filterfunc
+	lino       int
+	specifiers []Specifier
+	filter     filterfunc
 }
 
 func NewReader(rs io.Reader, pattern, filter string) (*Reader, error) {
@@ -25,10 +29,10 @@ func NewReader(rs io.Reader, pattern, filter string) (*Reader, error) {
 	)
 	r.inner = bufio.NewScanner(rs)
 
-	if r.parse, err = parseFormat(pattern); err != nil {
+	if r.specifiers, err = ParseFormat(pattern); err != nil {
 		return nil, err
 	}
-	if r.filter, err = parseFilter(filter); err != nil {
+	if r.filter, err = ParseFilter(filter); err != nil {
 		return nil, err
 	}
 	return &r, nil
@@ -77,9 +81,9 @@ func (r *Reader) readNext() (LogEntry, error) {
 			r.err = err
 			return es, r.err
 		}
-		es = LogEntry {
-			Lino: r.lino,
-			Line: line,
+		es = LogEntry{
+			Lino:   r.lino,
+			Line:   line,
 			Fields: fs,
 		}
 		if r.filter == nil || r.filter(es) {
@@ -91,12 +95,12 @@ func (r *Reader) readNext() (LogEntry, error) {
 
 func (r *Reader) readLine(line string) ([]LogField, error) {
 	var (
-		fs  = make([]LogField, 0, len(r.parse))
+		fs  = make([]LogField, 0, len(r.specifiers))
 		str = scan(line)
 	)
-	for i := range r.parse {
+	for i := range r.specifiers {
 		var lf LogField
-		err := r.parse[i](&lf, str)
+		err := r.specifiers[i].parse(&lf, str)
 		if err != nil {
 			return nil, err
 		}
