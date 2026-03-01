@@ -39,6 +39,54 @@ type Specifier struct {
 	parse parsefunc
 }
 
+func Time(format string, size int) Specifier {
+	return createSpecifier("time", 'w', getWhen(format, size))
+}
+
+func Blank() Specifier {
+	return createSpecifier("blank", 'b', getBlank)
+}
+
+func Pid() Specifier {
+	return createSpecifier("pid", 'p', getPID)
+}
+
+func Process() Specifier {
+	return createSpecifier("process", 'n', getProcess)
+}
+
+func Level() Specifier {
+	return createSpecifier("level", 'l', getLevel)
+}
+
+func User() Specifier {
+	return createSpecifier("user", 'u', getUser)
+}
+
+func Group() Specifier {
+	return createSpecifier("group", 'g', getUser)
+}
+
+func Hostname(get hostfunc) Specifier {
+	return createSpecifier("hostname", 'h', getHost(get))
+}
+
+func Message() Specifier {
+	return createSpecifier("message", 'm', getMessage)
+}
+
+func Word(name string) Specifier {
+	return createSpecifier("word", 'm', getWord(name))
+}
+
+func createSpecifier(name string, char rune, fn parsefunc) Specifier {
+	return Specifier{
+		Name:  name,
+		Char:  char,
+		parse: fn,
+	}
+}
+
 func ParseFormat(pattern string) ([]Specifier, error) {
 	if pattern == "" {
 		return nil, fmt.Errorf("%w: empty pattern not allowed", ErrSyntax)
@@ -99,56 +147,44 @@ func parsePattern(str *scanner) ([]Specifier, error) {
 }
 
 func parseSpecifier(str *scanner) (Specifier, error) {
-	var spec Specifier
-	spec.Char = str.read()
-	switch spec.Char {
+	char := str.read()
+	switch char {
 	case 't':
-		spec.Name = "time"
 		format, size, err := parseTimeFormat(str)
 		if err != nil {
-			return spec, err
+			return Specifier{}, err
 		}
-		spec.parse = getWhen(format, size)
+		return Time(format, size), nil
 	case 'b':
-		spec.Name = "blank"
-		spec.parse = getBlank
+		return Blank(), nil
 	case 'n':
-		spec.Name = "process"
-		spec.parse = getProcess
+		return Process(), nil
 	case 'p':
-		spec.Name = "pid"
-		spec.parse = getPID
+		return Pid(), nil
 	case 'u':
-		spec.Name = "user"
-		spec.parse = getUser
+		return User(), nil
 	case 'g':
-		spec.Name = "group"
-		spec.parse = getGroup
+		return Group(), nil
 	case 'h':
 		get, err := parseHostFormat(str)
 		if err != nil {
-			return spec, err
+			return Specifier{}, err
 		}
-		spec.Name = "host"
-		spec.parse = getHost(get)
+		return Hostname(get), nil
 	case 'l':
-		spec.Name = "level"
-		spec.parse = getLevel
+		return Level(), nil
 	case 'm':
-		spec.Name = "message"
-		spec.parse = getMessage
+		return Message(), nil
 	case 'w':
 		var name string
 		if str.peek() == '(' {
 			str.read()
 			name = str.readUntil(func(r rune) bool { return r != ')' })
 		}
-		spec.Name = "word"
-		spec.parse = getWord(name)
+		return Word(name), nil
 	default:
-		return spec, fmt.Errorf("%w: specifier '%%%c' not recognized", ErrSyntax, spec.Char)
+		return Specifier{}, fmt.Errorf("%w: specifier '%%%c' not recognized", ErrSyntax, char)
 	}
-	return spec, nil
 }
 
 func parseHostFormat(str *scanner) (hostfunc, error) {
