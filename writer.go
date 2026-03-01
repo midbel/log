@@ -9,7 +9,7 @@ type Writer interface {
 	Write([]LogField) error
 }
 
-type textWriter struct {
+type TextWriter struct {
 	inner      *bufio.Writer
 	specifiers []PrintSpecifier
 }
@@ -22,14 +22,18 @@ func Text(ws io.Writer, pattern string) (Writer, error) {
 	if err != nil {
 		return nil, err
 	}
-	w := textWriter{
+	w := TextWriter{
 		inner:      bufio.NewWriter(ws),
 		specifiers: specs,
 	}
 	return &w, nil
 }
 
-func (w *textWriter) Write(fs []LogField) error {
+func (w *TextWriter) Attach(spec PrintSpecifier) {
+	w.specifiers = append(w.specifiers, spec)
+}
+
+func (w *TextWriter) Write(fs []LogField) error {
 	for _, ps := range w.specifiers {
 		ps.print(fs, w.inner)
 	}
@@ -37,7 +41,7 @@ func (w *textWriter) Write(fs []LogField) error {
 	return w.inner.Flush()
 }
 
-type structWriter struct {
+type StructuredWriter struct {
 	inner      *bufio.Writer
 	specifiers []PrintSpecifier
 }
@@ -50,14 +54,18 @@ func Structured(ws io.Writer, pattern string) (Writer, error) {
 	if err != nil {
 		return nil, err
 	}
-	w := structWriter{
+	w := StructuredWriter{
 		inner:      bufio.NewWriter(ws),
 		specifiers: specs,
 	}
 	return &w, nil
 }
 
-func (w *structWriter) Write(fs []LogField) error {
+func (w *StructuredWriter) Attach(spec PrintSpecifier) {
+	w.specifiers = append(w.specifiers, spec)
+}
+
+func (w *StructuredWriter) Write(fs []LogField) error {
 	for _, ps := range w.specifiers {
 		if ps.Char != 'w' && ps.Char != 'b' {
 			io.WriteString(w.inner, ps.Name)

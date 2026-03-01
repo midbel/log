@@ -63,6 +63,10 @@ func NewReader(rs io.Reader, pattern string) (*LogReader, error) {
 	return &r, nil
 }
 
+func (r *LogReader) Attach(spec Specifier) {
+	r.specifiers = append(r.specifiers, spec)
+}
+
 func (r *LogReader) Read() ([]string, error) {
 	es, err := r.readNext()
 	if err != nil {
