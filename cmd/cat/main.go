@@ -19,8 +19,8 @@ func main() {
 	flag.Parse()
 
 	var (
-		in = os.Stdin
-		rs log.Reader
+		in  = os.Stdin
+		rs  log.Reader
 		err error
 	)
 

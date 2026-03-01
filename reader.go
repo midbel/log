@@ -11,13 +11,13 @@ type Reader interface {
 }
 
 type LogFilter struct {
-	inner Reader
+	inner  Reader
 	filter filterfunc
 }
 
 func Filter(rs Reader, filter string) (Reader, error) {
 	var (
-		r LogFilter
+		r   LogFilter
 		err error
 	)
 	r.inner = rs
