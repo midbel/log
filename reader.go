@@ -6,9 +6,10 @@ import (
 	"io"
 )
 
-// type Reader interface {
-// 	Next() (LogEntry, error)
-// }
+type Reader interface {
+	// Read() ([]string, error)
+	Next() (LogEntry, error)
+}
 
 type Reader struct {
 	inner *bufio.Scanner
