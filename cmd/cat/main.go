@@ -18,7 +18,11 @@ func main() {
 	)
 	flag.Parse()
 
-	var in = os.Stdin
+	var (
+		in = os.Stdin
+		rs log.Reader
+		err error
+	)
 
 	if flag.NArg() > 0 {
 		r, err := os.Open(flag.Arg(0))
@@ -30,32 +34,39 @@ func main() {
 		in = r
 	}
 
-	rs, err := log.NewReader(in, *inpat, *filter)
+	rs, err = log.NewReader(in, *inpat)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	if *filter != "" {
+		rs, err = log.Filter(rs, *filter)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}
 	err = toLog(rs, *outpat)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
+		os.Exit(1)
 	}
 }
 
-func toLog(rs *log.Reader, format string) error {
+func toLog(rs log.Reader, format string) error {
 	ws, err := log.Text(os.Stdout, format)
 	if err != nil {
 		return err
 	}
 	for {
-		fs, err := rs.Next()
+		e, err := rs.Next()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				break
 			}
 			return err
 		}
-		ws.Write(fs)
+		ws.Write(e.Fields)
 	}
 	return nil
 }

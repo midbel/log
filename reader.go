@@ -7,25 +7,52 @@ import (
 )
 
 type Reader interface {
-	// Read() ([]string, error)
 	Next() (LogEntry, error)
 }
 
-type Reader struct {
+type LogFilter struct {
+	inner Reader
+	filter filterfunc
+}
+
+func Filter(rs Reader, filter string) (Reader, error) {
+	var (
+		r LogFilter
+		err error
+	)
+	r.inner = rs
+	if r.filter, err = ParseFilter(filter); err != nil {
+		return nil, err
+	}
+	return &r, err
+}
+func (r *LogFilter) Next() (LogEntry, error) {
+	for {
+		e, err := r.inner.Next()
+		if err != nil {
+			return e, err
+		}
+		ok := r.filter(e)
+		if ok {
+			return e, nil
+		}
+	}
+}
+
+type LogReader struct {
 	inner *bufio.Scanner
 	err   error
 
 	lino       int
 	specifiers []Specifier
-	filter     filterfunc
 }
 
-func NewReader(rs io.Reader, pattern, filter string) (*Reader, error) {
+func NewReader(rs io.Reader, pattern string) (*LogReader, error) {
 	if str, ok := resolveParseFormat(pattern); ok {
 		pattern = str
 	}
 	var (
-		r   Reader
+		r   LogReader
 		err error
 	)
 	r.inner = bufio.NewScanner(rs)
@@ -33,13 +60,10 @@ func NewReader(rs io.Reader, pattern, filter string) (*Reader, error) {
 	if r.specifiers, err = ParseFormat(pattern); err != nil {
 		return nil, err
 	}
-	if r.filter, err = ParseFilter(filter); err != nil {
-		return nil, err
-	}
 	return &r, nil
 }
 
-func (r *Reader) Read() ([]string, error) {
+func (r *LogReader) Read() ([]string, error) {
 	es, err := r.readNext()
 	if err != nil {
 		return nil, err
@@ -51,12 +75,12 @@ func (r *Reader) Read() ([]string, error) {
 	return rs, nil
 }
 
-func (r *Reader) Next() ([]LogField, error) {
+func (r *LogReader) Next() (LogEntry, error) {
 	e, err := r.readNext()
-	return e.Fields, err
+	return e, err
 }
 
-func (r *Reader) readNext() (LogEntry, error) {
+func (r *LogReader) readNext() (LogEntry, error) {
 	var es LogEntry
 	if r.err != nil {
 		return es, r.err
@@ -87,14 +111,12 @@ func (r *Reader) readNext() (LogEntry, error) {
 			Line:   line,
 			Fields: fs,
 		}
-		if r.filter == nil || r.filter(es) {
-			break
-		}
+		break
 	}
 	return es, r.err
 }
 
-func (r *Reader) readLine(line string) ([]LogField, error) {
+func (r *LogReader) readLine(line string) ([]LogField, error) {
 	var (
 		fs  = make([]LogField, 0, len(r.specifiers))
 		str = scan(line)
