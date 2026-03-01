@@ -6,9 +6,68 @@ import (
 	"io"
 	"slices"
 	"strconv"
-	"strings"
 	"time"
 )
+
+type PrintStyle struct {
+	Width int
+	Left  bool
+	Back  string
+	Fore  string
+}
+
+type PrintSpecifier struct {
+	Name string
+	Char rune
+
+	Style PrintStyle
+
+	print printfunc
+}
+
+func PrintTime(format string) PrintSpecifier {
+	return createPrint("time", 't', printTime(format))
+}
+
+func PrintPID() PrintSpecifier {
+	return createPrint("pid", 'p', printPID)
+}
+
+func PrintProcess() PrintSpecifier {
+	return createPrint("process", 'n', printProcess)
+}
+
+func PrintLevel() PrintSpecifier {
+	return createPrint("level", 'l', printLevel)
+}
+
+func PrintHost() PrintSpecifier {
+	return createPrint("host", 'u', printHost)
+}
+
+func PrintUser() PrintSpecifier {
+	return createPrint("user", 'u', printUser)
+}
+
+func PrintGroup() PrintSpecifier {
+	return createPrint("group", 'g', printGroup)
+}
+
+func PrintMessage() PrintSpecifier {
+	return createPrint("message", 'm', printMessage)
+}
+
+func PrintWord(ix int) PrintSpecifier {
+	return createPrint("word", 'w', printWord(ix))
+}
+
+func createPrint(name string, char rune, fn printfunc) PrintSpecifier {
+	return PrintSpecifier{
+		Name:  name,
+		Char:  char,
+		print: fn,
+	}
+}
 
 type printfunc func([]LogField, io.StringWriter)
 
@@ -25,14 +84,14 @@ type printfunc func([]LogField, io.StringWriter)
 // %[digit]: word
 // %%: a percent sign
 // c : any character(s)
-func parsePrint(pattern string) (printfunc, error) {
+func ParsePrint(pattern string) ([]PrintSpecifier, error) {
 	if pattern == "" {
 		return nil, fmt.Errorf("%w: empty pattern not allowed", ErrSyntax)
 	}
 	var (
 		str = scan(pattern)
 		buf bytes.Buffer
-		pfs []printinfo
+		pfs []PrintSpecifier
 	)
 	for {
 		char := str.read()
@@ -42,60 +101,64 @@ func parsePrint(pattern string) (printfunc, error) {
 		if k := str.peek(); char == '%' && k != char {
 			char = str.read()
 			if buf.Len() > 0 {
-				fn := printLiteral(buf.String())
-				pfs = append(pfs, infoFromFunc(fn))
+				spec := PrintSpecifier{
+					print: printLiteral(buf.String()),
+				}
+				pfs = append(pfs, spec)
 				buf.Reset()
 			}
-			var info printinfo
+			var style PrintStyle
 			if isDigit(char) {
 				str.unread()
-				info.Width, _ = strconv.Atoi(str.readNumber())
+				style.Width, _ = strconv.Atoi(str.readNumber())
 				char = str.read()
 			}
 			if char == '[' {
-				info.Fore = str.readUntil(func(r rune) bool {
+				style.Fore = str.readUntil(func(r rune) bool {
 					return r != ',' && r != ']'
 				})
 				if str.current() == ',' {
-					info.Back = str.readUntil(func(r rune) bool { return r != ']' })
+					style.Back = str.readUntil(func(r rune) bool { return r != ']' })
 				}
 				if str.current() != ']' {
 					return nil, fmt.Errorf("missing closing ']")
 				}
 				char = str.read()
 			}
+			var spec PrintSpecifier
 			switch char {
 			case 't':
 				format, _, err := parseTimeFormat(str)
 				if err != nil {
 					return nil, err
 				}
-				info.Func = printTime(format)
+				spec = PrintTime(format)
 			case 'n':
-				info.Func = printProcess
+				spec = PrintProcess()
 			case 'p':
-				info.Func = printPID
+				spec = PrintPID()
 			case 'u':
-				info.Func = printUser
+				spec = PrintUser()
 			case 'g':
-				info.Func = printGroup
+				spec = PrintGroup()
 			case 'h':
-				info.Func = printHost
+				spec = PrintHost()
 			case 'l':
-				info.Func = printLevel
+				spec = PrintLevel()
 			case 'm':
-				info.Func = printMessage
+				spec = PrintMessage()
 			case 'w':
-				info.Func = printName("")
+				spec = PrintWord(0)
 			default:
 				if !isDigit(char) {
 					return nil, fmt.Errorf("%w(print): unknown specifier %%%c", ErrPattern, char)
 				}
 				str.unread()
 				n, _ := strconv.Atoi(str.readNumber())
-				info.Func = printWord(n)
+				spec = PrintWord(n)
 			}
-			pfs = append(pfs, info)
+			spec.Style = style
+			pfs = append(pfs, spec)
 		} else {
 			if char == '%' && k == char {
 				str.read()
@@ -104,64 +167,12 @@ func parsePrint(pattern string) (printfunc, error) {
 		}
 	}
 	if buf.Len() > 0 {
-		fn := printLiteral(buf.String())
-		pfs = append(pfs, infoFromFunc(fn))
-	}
-	return mergePrint(pfs), nil
-}
-
-type printinfo struct {
-	Width int
-	Left  bool
-	Back  string
-	Fore  string
-	Func  printfunc
-}
-
-func infoFromFunc(fn printfunc) printinfo {
-	return printinfo{
-		Func: fn,
-	}
-}
-
-func (p printinfo) Print(fs []LogField, w io.StringWriter) {
-	if code := foregroundAnsiCodes[p.Fore]; code != "" {
-		w.WriteString(code)
-	}
-	if code := backgroundAnsiCodes[p.Back]; code != "" {
-		w.WriteString(code)
-	}
-	var (
-		ws  = w
-		tmp bytes.Buffer
-	)
-	if p.Width > 0 {
-		ws = &tmp
-	}
-	p.Func(fs, ws)
-	if p.Width > 0 {
-		diff := p.Width - tmp.Len()
-		if diff > 0 {
-			tmp.WriteString(strings.Repeat(" ", diff))
-		} else if diff < 0 {
-			tmp.Truncate(tmp.Len() + diff)
+		spec := PrintSpecifier{
+			print: printLiteral(buf.String()),
 		}
-		w.WriteString(tmp.String())
+		pfs = append(pfs, spec)
 	}
-	if p.Fore != "" || p.Back != "" {
-		w.WriteString(resetAnsiCode)
-	}
-}
-
-func mergePrint(pfs []printinfo) printfunc {
-	if len(pfs) == 1 {
-		return pfs[0].Print
-	}
-	return func(fs []LogField, w io.StringWriter) {
-		for _, p := range pfs {
-			p.Print(fs, w)
-		}
-	}
+	return pfs, nil
 }
 
 func printLiteral(str string) printfunc {
